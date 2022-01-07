@@ -1,12 +1,10 @@
 import pandas
-from vquant.order import Order
-from position import Position
+from vquant.broker import Order
 
 
 class OrderStore(pandas.DataFrame):
     fields = [
-        'order_id', 'create_time', 'update_time', 'symbol', 'flag', 'side', 'type', 'price', 'deal_price',
-        'volume_origin', 'volume_traded', 'volume_total', 'order_status'
+        'id', 'datetime', 'symbol', 'flag', 'side', 'price', 'volume', 'commission', 'margin', 'status'
     ]
 
     def __init__(self):
@@ -14,24 +12,31 @@ class OrderStore(pandas.DataFrame):
 
 
 class TradeStore(pandas.DataFrame):
-    fields = ['trade_id', 'create_time', 'symbol', 'order_id', 'offset_flag', 'direction', 'price', 'volume', 'margin', 'profit']
+    fields = ['id', 'datetime', 'symbol', 'order_id', 'flag', 'side', 'price', 'volume', 'profit']
 
     def __init__(self):
         super(TradeStore, self).__init__(columns=self.fields)
 
 
 class PositionStore(pandas.DataFrame):
-    fields = ['symbol', 'cost', 'direction', 'volume', 'margin', 'profit']
+    fields = ['symbol', 'cost', 'direction', 'volume', 'margin']
 
     def __init__(self):
         super(PositionStore, self).__init__(columns=self.fields)
 
 
 class ProfitStore(pandas.DataFrame):
-    fields = ['timestamp', 'profit']
+    fields = ['datetime', 'amount']
 
     def __init__(self):
         super(ProfitStore, self).__init__(columns=self.fields)
+
+
+class ValueStore(pandas.DataFrame):
+    fields = ['datetime', 'value', 'benchmark_value']
+
+    def __init__(self):
+        super(ValueStore, self).__init__(columns=self.fields)
 
 
 class Store(object):
@@ -40,18 +45,19 @@ class Store(object):
         self.trades = TradeStore()
         self.positions = PositionStore()
         self.profits = ProfitStore()
+        self.values = ValueStore()
 
     def update_or_insert_order(self, order):
-        record = self.orders.loc[self.orders['order_id'] == order['order_id']]
+        record = self.orders.loc[self.orders['id'] == order['id']]
         if len(record.index) > 0:
-            self.orders.loc[record.index, self.orders.fields] = list(record.values())
+            self.orders.loc[record.index, OrderStore.fields] = list(order.values())
         else:
             self.orders = self.orders.append([order], ignore_index=True)
 
     def update_or_insert_position(self, position):
         record = self.positions.loc[(self.positions['symbol'] == position['symbol']) & (self.positions['direction'] == position['direction'])]
         if len(record.index) > 0:
-            self.positions.loc[record.index, self.orders.fields] = list(record.values())
+            self.positions.loc[record.index, PositionStore.fields] = list(position.values())
         else:
             self.positions = self.positions.append([position], ignore_index=True)
 
@@ -61,9 +67,11 @@ class Store(object):
     def insert_trade(self, trade):
         self.trades = self.trades.append([trade], ignore_index=True)
 
-    def active_orders(self):
-        return self.orders.loc[self.orders['status'].isin([Order.Created, Order.Submitted, Order.Accepted, Order.Partial])]
+    def query_orders(self, symbol, side):
+        return self.orders.loc[(self.orders['symbol'] == symbol) & (self.orders['side'] == side) & self.orders['status'].isin([Order.Created, Order.Submitted, Order.Accepted, Order.Partial])]
 
     def query_position(self, symbol, direction):
         return self.positions.loc[(self.positions['symbol'] == symbol) & (self.positions['direction'] == direction)]
 
+    def insert_value(self, value):
+        self.values = self.values.append([value], ignore_index=True)

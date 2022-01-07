@@ -1,4 +1,4 @@
-date,open,high,Low,Close,Volume,OpenInterest
+datetime,open,high,low,close,volume,openInterest
 2006-01-02,3578.73,3605.95,3578.73,3604.33,0,0
 2006-01-03,3604.08,3638.42,3601.84,3614.34,0,0
 2006-01-04,3615.23,3652.46,3615.23,3652.46,0,0

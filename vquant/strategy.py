@@ -1,46 +1,59 @@
-from vquant.param import Param
+from vquant.utils import Params
+from vquant.broker import Order, Position
 
 
 class Strategy(object):
+    params = tuple()
+
     def __init__(self, cerebro):
         self.cerebro = cerebro
-        if hasattr(self, 'params'):
-            self.param = Param(self.params)
+        self.datas = cerebro.datas
 
     @property
-    def datas(self):
-        return self.cerebro.datas
+    def p(self):
+        return Params(self.params)
+
+    @property
+    def index(self):
+        return self.cerebro.index
 
     @property
     def broker(self):
         return self.cerebro.broker
 
+    @property
+    def price(self):
+        return self.datas[0].loc[self.index].close
+
+    @property
+    def datetime(self):
+        return self.datas[0].loc[self.index].datetime
+
+    def position(self, symbol, direction):
+        return self.broker.positions(symbol, direction)
+
+    def buy(self, symbol, volume):
+        return self.broker.create_order(self.datetime, symbol, Order.Open, Order.Buy, self.price, volume)
+
+    def sell(self, symbol, volume):
+        return self.broker.create_order(self.datetime, symbol, Order.Open, Order.Sell, self.price, volume)
+
+    def close(self, symbol, direction, volume):
+        side = Order.Sell if direction == Position.Long else Order.Buy
+        return self.broker.create_order(self.datetime, symbol, Order.Close, side, self.price, volume)
+
     def log(self, txt):
         pass
 
-    def buy(self, volume):
-        return self.broker.buy(volume)
-
-    def buy_limit(self, price, volume):
-        return self.broker.buy_limit(price, volume)
-
-    def sell(self, volume):
-        return self.broker.sell(volume)
-
-    def sell_limit(self, price, volume):
-        return self.broker.sell_limit(price, volume)
-
     def notify_order(self, order):
-        '''
-        Receives an order whenever there has been a change in one
-        '''
         pass
 
     def notify_trade(self, trade):
-        '''
-        Receives a trade whenever there has been a change in one
-        '''
+        pass
+
+    def notify_profit(self, profit):
         pass
 
     def next(self):
         raise NotImplemented
+

@@ -2,42 +2,15 @@ import numpy
 import pandas
 import talib
 
-INDICATOR_MAP = [
-    'open', 'high', 'low', 'close', 'volume',
-    'cci8', 'cci18', 'cci28', 'cci60',
-    'stddev5', 'stddev8', 'stddev18', 'stddev20', 'stddev28',
-    'var5', 'var8', 'var18', 'var20', 'var28',
-    'bolling-ub', 'bolling-mb', 'bolling-lb',
-    'willr14', 'willr20', 'willr28',
-    'kdj-k', 'kdj-d', 'kdj-j',
-    'obv', 'macd', 'macdsignal', 'macddist',
-    'rsi8', 'rsi12', 'rsi14', 'rsi21', 'rsi25', 'rsi28', 'rsi60',
-    'rocp1', 'rocp2', 'rocp3', 'rocp4', 'rocp5', 'rocp21', 'rocp63', 'rocp125', 'rocp250',
-    'ma5', 'ma10', 'ma20', 'ma60', 'ma120', 'ma250',
-    'sma10', 'sma20', 'sma30', 'sma50',
-    'ema5', 'ema9', 'ema10', 'ema12', 'ema20', 'ema21', 'ema26', 'ema28', 'ema50', 'ema60', 'ema100', 'ema200',
-    'trange', 'atr14', 'natr14', '+di6', '+di14', '-di6', '-di14',
-    'dx6', 'dx14', 'adx6', 'adx14', 'adxr6', 'adxr14', 'trix12', 'trix30',
-    'slope8', 'slope14', 'slope28', 'slope60', 'slope120',
-    'angle8', 'angle14', 'angle28', 'angle60', 'angle120',
-    'intercept8', 'intercept14', 'intercept28', 'intercept60', 'intercept120',
-    'tsf8', 'tsf14', 'apo', 'aroondown', 'aroonup', 'bop', 'aroonosc8', 'aroonosc16',
-    'mfi8', 'mfi14', 'mom10', 'ppo',
-    'rocr2', 'rocr4', 'rocr8', 'rocr16',
-    'stoch-k', 'stoch-d', 'ultosc', 'trendline', 'sar',
-    'cmo-14', 'cmo-28', 'ad', 'adosc', 'dcperiod', 'dcphase', 'inphase', 'quadrature', 'sine', 'leadsine', 'trendmode',
-    'beta-5', 'beta-14', 'beta-28', 'correl-14', 'correl-30'
-]
-
 
 class Indicator(object):
     def __init__(self, data: pandas.DataFrame):
-        self.low = data.low.values()
-        self.open = data.open.values()
-        self.high = data.open.values()
-        self.close = data.open.values()
-        self.volume = data.open.values()
-        self.timestamp = numpy.array(data['datetime'])
+        self.open = data.open.values
+        self.high = data.open.values
+        self.low = data.low.values
+        self.close = data.open.values
+        self.volume = data.open.values
+        self.datetime = data.datetime.values
 
     def cci(self, time_period):
         # time_period: 8, 18, 28, 60
