@@ -4,6 +4,10 @@ from vquant.indicators import Indicator
 
 
 class MAStrategy(Strategy):
+    params = (
+        ('symbol', 'j0'),
+    )
+
     def __init__(self, cerebro):
         super(MAStrategy, self).__init__(cerebro)
         self.datas[0] = Indicator(self.datas[0]).ma(7)
@@ -19,26 +23,23 @@ class MAStrategy(Strategy):
     #     print(profit.__dict__())
 
     def next(self):
-        # print(self.datas[0][:self.index])
-        print(self.datas[0].iloc[-20:])
-        ma7 = self.datas[0].loc[self.index].ma7
-        ma30 = self.datas[0].loc[self.index].ma30
-        long_position = self.position('a2201', Position.Long)
+        bar = self.datas[0].loc[self.index]
+        long_position = self.position(self.p.symbol, Position.Long)
         if long_position.volume:
-            if ma7 > ma30:
+            if bar.ma7 > bar.ma30:
                 return
-            self.close('a2201', Position.Long, long_position.volume)
+            self.close(self.p.symbol, Position.Long, long_position.volume)
         else:
-            if ma7 > ma30:
-                self.buy('a2201', 1)
-        short_position = self.position('a2201', Position.Short)
+            if bar.ma7 > bar.ma30:
+                self.buy(self.p.symbol, 1)
+        short_position = self.position(self.p.symbol, Position.Short)
         if short_position.volume:
-            if ma7 < ma30:
+            if bar.ma7 < bar.ma30:
                 return
-            self.close('a2201', Position.Short, short_position.volume)
+            self.close(self.p.symbol, Position.Short, short_position.volume)
         else:
-            if ma7 < ma30:
-                self.sell('a2201', 1)
+            if bar.ma7 < bar.ma30:
+                self.sell(self.p.symbol, 1)
 
 
 if __name__ == '__main__':
@@ -47,11 +48,12 @@ if __name__ == '__main__':
     from vquant.feeds.csvread import CSVRead
 
     cerebro = Cerebro(broker=BackBroker)
-    symbol_info = SymbolInfo(5, 0.2, 5, 0)
-    cerebro.broker.add_symbol('a2201', symbol_info)
+    symbol_info = SymbolInfo(commission=3, margin_rate=0.09, volume_multiple=100, target_index=0)
+    cerebro.broker.add_symbol('j0', symbol_info)
     cerebro.broker.set_cash(1000000)
     data = CSVRead('../datas/2006day1.csv').data
     cerebro.add_data(data)
     cerebro.add_strategy(MAStrategy)
     r = cerebro.run()
     print(r)
+    cerebro.show(r)

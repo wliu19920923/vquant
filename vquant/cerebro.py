@@ -1,6 +1,7 @@
 import pandas
 from vquant.analyzers import Analyzer
 from vquant.broker import Order
+from matplotlib import pyplot
 
 
 class Cerebro(object):
@@ -38,6 +39,13 @@ class Cerebro(object):
         results['sell_signal'] = self.broker.store.trades.loc[(self.broker.store.trades['flag'] == Order.Open) & (self.broker.store.trades['side'] == Order.Sell)].shape[0]
         results['trades'] = self.broker.store.trades.to_dict(orient='records')
         return results
+
+    def show(self, results):
+        data = results['values']
+        x = [i['datetime'] for i in data]
+        y = [i['value'] for i in data]
+        pyplot.plot(x, y)
+        pyplot.show()
 
     def run(self):
         self.index = self.datas[0].iloc[0].datetime

@@ -110,8 +110,9 @@ if __name__ == '__main__':
     symbol_info = SymbolInfo(commission=3, margin_rate=0.09, volume_multiple=100, target_index=0)
     cerebro.broker.add_symbol('j0', symbol_info)
     cerebro.broker.set_cash(1000000)
-    data = CSVRead('../datas/J0_30m.csv').data
+    data = CSVRead('../datas/RB0_30m.csv').data
     cerebro.add_data(data)
     cerebro.add_strategy(SF38LongStarategy)
     r = cerebro.run()
     print(r)
+    cerebro.show(r)

@@ -32,4 +32,4 @@ class Sina(object):
 
 
 if __name__ == '__main__':
-    Sina('J0', '30m').run()
+    Sina('RB0', '30m').run()
