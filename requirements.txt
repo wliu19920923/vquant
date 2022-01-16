@@ -2,4 +2,3 @@ aiohttp
 empyrical
 numpy
 pandas
-Ta-Lib
