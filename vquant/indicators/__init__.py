@@ -32,7 +32,7 @@ class Indicator(object):
         self.__data.loc[:, 'willr%d' % period] = talib.WILLR(self.__data.high.values, self.__data.low.values, self.__data.close.values, timeperiod=period).tolist()
         return self.__data
 
-    def kdj_k(self):
+    def kdj(self):
         kdj = talib.STOCH(self.__data.high.values, self.__data.low.values, self.__data.close.values, fastk_period=9, slowk_period=3, slowk_matype=0, slowd_period=3, slowd_matype=0)
         self.__data.loc[:, 'kdj_k'] = kdj[0].tolist()
         self.__data.loc[:, 'kdj_d'] = kdj[1].tolist()
@@ -52,12 +52,12 @@ class Indicator(object):
 
     def rsi(self, period):
         # period: 12, 14, 21, 25
-        self.__data.loc[:, 'rsi'] = talib.RSI(self.__data.close.values, timeperiod=period).tolist()
+        self.__data.loc[:, 'rsi%d' % period] = talib.RSI(self.__data.close.values, timeperiod=period).tolist()
         return self.__data
 
     def rocp(self, period):
         # period: 1, 2, 3, 4, 5, 21, 63, 125, 250
-        self.__data.loc[:, 'rocp'] = talib.ROCP(self.__data.close.values, timeperiod=period).tolist()
+        self.__data.loc[:, 'rocp%d' % period] = talib.ROCP(self.__data.close.values, timeperiod=period).tolist()
         return self.__data
 
     def ma(self, period):

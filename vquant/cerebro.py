@@ -29,13 +29,7 @@ class Cerebro(object):
         for strategy in self.strategies:
             strategy.notify_profit(profit)
 
-    def run(self):
-        self.index = self.datas[0].iloc[0].datetime
-        for row in self.datas[0].itertuples():
-            self.index = row.datetime
-            for strategy in self.strategies:
-                strategy.next()
-            self.broker.settlement()
+    def analyze(self):
         results = Analyzer(self.broker.store.values).results()
         results['value'] = self.broker.value
         results['init_cash'] = self.broker.init_cash
@@ -44,3 +38,12 @@ class Cerebro(object):
         results['sell_signal'] = self.broker.store.trades.loc[(self.broker.store.trades['flag'] == Order.Open) & (self.broker.store.trades['side'] == Order.Sell)].shape[0]
         results['trades'] = self.broker.store.trades.to_dict(orient='records')
         return results
+
+    def run(self):
+        self.index = self.datas[0].iloc[0].datetime
+        for row in self.datas[0].itertuples():
+            self.index = row.datetime
+            for strategy in self.strategies:
+                strategy.next()
+            self.broker.settlement()
+        return self.analyze()

@@ -19,6 +19,8 @@ class MAStrategy(Strategy):
     #     print(profit.__dict__())
 
     def next(self):
+        # print(self.datas[0][:self.index])
+        print(self.datas[0].iloc[-20:])
         ma7 = self.datas[0].loc[self.index].ma7
         ma30 = self.datas[0].loc[self.index].ma30
         long_position = self.position('a2201', Position.Long)
