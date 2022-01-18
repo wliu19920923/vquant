@@ -10,10 +10,11 @@ class SymbolInfo(object):
         - target_index: 数据下标
     """
 
-    def __init__(self, commission, margin_rate, volume_multiple, target_index):
+    def __init__(self, commission, margin_rate, volume_multiple, price_tick, target_index):
         self.commission = commission
         self.margin_rate = margin_rate
         self.volume_multiple = volume_multiple
+        self.price_tick = price_tick
         self.target_index = target_index
 
 
@@ -26,14 +27,14 @@ class Order(object):
       - Buy: buy
       - Sell: Sell
       Order Status
-      - Submitted: sent to the broker and awaiting confirmation
-      - Accepted: accepted by the broker
+      - Submitted: sent to the brokers and awaiting confirmation
+      - Accepted: accepted by the brokers
       - Partial: partially executed
       - Completed: fully exexcuted
       - Canceled/Cancelled: canceled by the user
       - Expired: expired
       - Margin: not enough cash to execute the order.
-      - Rejected: Rejected by the broker
+      - Rejected: Rejected by the brokers
     """
     Open, Close = range(2)
     Flags = ['Open', 'Close']

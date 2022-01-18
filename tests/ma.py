@@ -1,4 +1,4 @@
-from vquant.broker import SymbolInfo, Position
+from vquant.brokers import SymbolInfo, Position
 from vquant.strategy import Strategy
 from vquant.indicators import Indicator
 
@@ -44,11 +44,11 @@ class MAStrategy(Strategy):
 
 if __name__ == '__main__':
     from vquant.cerebro import Cerebro
-    from vquant.broker.backbroker import BackBroker
+    from vquant.brokers.backbroker import BackBroker
     from vquant.feeds.csvread import CSVRead
 
     cerebro = Cerebro(broker=BackBroker)
-    symbol_info = SymbolInfo(commission=3, margin_rate=0.09, volume_multiple=100, target_index=0)
+    symbol_info = SymbolInfo(commission=3, margin_rate=0.09, volume_multiple=100, price_tick=0.01, target_index=0)
     cerebro.broker.add_symbol('j0', symbol_info)
     cerebro.broker.set_cash(1000000)
     data = CSVRead('../datas/2006day1.csv').data

@@ -1,4 +1,4 @@
-from vquant.broker import Order, Trade, Position, Profit
+from vquant.brokers import Order, Trade, Position, Profit
 from vquant.stores import Store
 
 

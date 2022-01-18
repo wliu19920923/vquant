@@ -1,6 +1,6 @@
 import pandas
 from vquant.analyzers import Analyzer
-from vquant.broker import Order
+from vquant.brokers import Order
 from matplotlib import pyplot
 
 

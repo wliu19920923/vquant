@@ -1,10 +1,10 @@
 import pandas
-from vquant.brokers import Order
+from vquant.library.ctp.win64 import thosttraderapi
 
 
 class OrderStore(pandas.DataFrame):
     fields = [
-        'id', 'datetime', 'symbol', 'flag', 'side', 'price', 'volume', 'commission', 'margin', 'status'
+        'id', 'datetime', 'symbol', 'order_ref', 'exchange_id', 'flag', 'side', 'price', 'volume', 'commission', 'margin', 'status'
     ]
 
     def __init__(self):
@@ -12,14 +12,14 @@ class OrderStore(pandas.DataFrame):
 
 
 class TradeStore(pandas.DataFrame):
-    fields = ['id', 'datetime', 'symbol', 'order_id', 'flag', 'side', 'price', 'volume', 'profit']
+    fields = ['id', 'datetime', 'symbol', 'order_id', 'exchange_id', 'flag', 'side', 'price', 'volume', 'profit']
 
     def __init__(self):
         super(TradeStore, self).__init__(columns=self.fields)
 
 
 class PositionStore(pandas.DataFrame):
-    fields = ['symbol', 'cost', 'direction', 'volume', 'margin']
+    fields = ['symbol', 'cost', 'direction', 'volume', 'margin', 'today_volume', 'yesterday_volume']
 
     def __init__(self):
         super(PositionStore, self).__init__(columns=self.fields)
@@ -67,8 +67,9 @@ class Store(object):
     def insert_trade(self, trade):
         self.trades = self.trades.append([trade], ignore_index=True)
 
-    def query_orders(self, symbol, side):
-        return self.orders.loc[(self.orders['symbol'] == symbol) & (self.orders['side'] == side) & self.orders['status'].isin([Order.Created, Order.Submitted, Order.Accepted, Order.Partial])]
+    def query_orders(self, symbol):
+        active_status = [thosttraderapi.THOST_FTDC_OST_PartTradedQueueing, thosttraderapi.THOST_FTDC_OST_PartTradedNotQueueing, thosttraderapi.THOST_FTDC_OST_NoTradeQueueing, thosttraderapi.THOST_FTDC_OST_NoTradeNotQueueing, thosttraderapi.THOST_FTDC_OST_NoTradeQueueing, thosttraderapi.THOST_FTDC_OST_NoTradeNotQueueing, thosttraderapi.THOST_FTDC_OST_NotTouched, thosttraderapi.THOST_FTDC_OST_Touched]
+        return self.orders.loc[(self.orders['symbol'] == symbol) & self.orders['status'].isin(active_status)]
 
     def query_position(self, symbol, direction):
         return self.positions.loc[(self.positions['symbol'] == symbol) & (self.positions['direction'] == direction)]
