@@ -1,9 +1,75 @@
-from datetime import datetime
 from vquant.utils import exception_catcher
 from vquant.utils.logger import get_logger
-from server_check import check_address_port
-from fields import QryTradingAccountField, QryInvestorPositionField, OrderInsertField, QrySettlementInfoField, SettlementInfoConfirmField, AuthenticateField, UserLoginField
+from vquant.utils.server_check import check_address_port
 from vquant.library.ctp.win64 import thosttraderapi
+
+
+class AuthenticateField(object):
+    def __init__(self, app_id, auth_code, broker_id, investor_id):
+        self.field = thosttraderapi.CThostFtdcReqAuthenticateField()
+        self.field.AppID = app_id
+        self.field.AuthCode = auth_code
+        self.field.BrokerID = broker_id
+        self.field.UserID = investor_id
+
+
+class UserLoginField(object):
+    def __init__(self, broker_id, investor_id, password):
+        self.field = thosttraderapi.CThostFtdcReqUserLoginField()
+        self.field.BrokerID = broker_id
+        self.field.UserID = investor_id
+        self.field.Password = password
+
+
+class QrySettlementInfoField(object):
+    def __init__(self, broker_id, investor_id, trading_day):
+        self.field = thosttraderapi.CThostFtdcQrySettlementInfoField()
+        self.field.BrokerID = broker_id
+        self.field.InvestorID = investor_id
+        self.field.TradingDay = trading_day
+
+
+class SettlementInfoConfirmField(object):
+    def __init__(self, broker_id, investor_id):
+        self.field = thosttraderapi.CThostFtdcSettlementInfoConfirmField()
+        self.field.BrokerID = broker_id
+        self.field.InvestorID = investor_id
+
+
+class QryTradingAccountField(object):
+    def __init__(self, broker_id, investor_id):
+        self.field = thosttraderapi.CThostFtdcQryTradingAccountField()
+        self.field.BrokerID = broker_id
+        self.field.InvestorID = investor_id
+        self.field.CurrencyID = 'CNY'
+
+
+class QryInvestorPositionField(object):
+    def __init__(self, broker_id, investor_id, instrument_id):
+        self.field = thosttraderapi.CThostFtdcQryInvestorPositionField()
+        self.field.BrokerID = broker_id
+        self.field.InvestorID = investor_id
+        self.field.InstrumentID = instrument_id
+
+
+class OrderInsertField(object):
+    def __init__(self, order_ref, broker_id, investor_id, exchange_id, instrument_id, offset_flag, direction, price, volume):
+        self.field = thosttraderapi.CThostFtdcInputOrderField()
+        self.field.OrderRef = order_ref
+        self.field.BrokerID = broker_id
+        self.field.InvestorID = investor_id
+        self.field.ExchangeID = exchange_id
+        self.field.InstrumentID = instrument_id
+        self.field.Direction = direction
+        self.field.LimitPrice = price
+        self.field.VolumeTotalOriginal = volume
+        self.field.OrderPriceType = thosttraderapi.THOST_FTDC_OPT_LimitPrice
+        self.field.ContingentCondition = thosttraderapi.THOST_FTDC_CC_Immediately
+        self.field.TimeCondition = thosttraderapi.THOST_FTDC_TC_IOC
+        self.field.VolumeCondition = thosttraderapi.THOST_FTDC_VC_AV
+        self.field.CombHedgeFlag = thosttraderapi.THOST_FTDC_HF_Speculation
+        self.field.CombOffsetFlag = offset_flag
+        self.field.ForceCloseReason = thosttraderapi.THOST_FTDC_FCC_NotForceClose
 
 
 class TraderApi(thosttraderapi.CThostFtdcTraderSpi):
@@ -46,8 +112,8 @@ class TraderApi(thosttraderapi.CThostFtdcTraderSpi):
     def sync_position(self, instrument_id):
         self.api.ReqQryInvestorPosition(QryInvestorPositionField(self.broker_id, self.investor_id, instrument_id).field, self.request_id)
 
-    def create_order(self, order_ref, exchange_id, instrument_id, offset_flag, direction, price, volume):
-        self.api.ReqOrderInsert(OrderInsertField(order_ref, self.broker_id, self.investor_id, exchange_id, instrument_id, offset_flag, direction, price, volume).field, self.request_id)
+    def create_order(self, exchange_id, instrument_id, offset_flag, direction, price, volume):
+        self.api.ReqOrderInsert(OrderInsertField(self.broker_id, self.investor_id, exchange_id, instrument_id, offset_flag, direction, price, volume).field, self.request_id)
 
     def get_settlement_info(self, trading_day):
         self.api.ReqQrySettlementInfo(QrySettlementInfoField(self.broker_id, self.investor_id, trading_day).field, self.request_id)
@@ -113,15 +179,13 @@ class TraderApi(thosttraderapi.CThostFtdcTraderSpi):
     def OnRtnOrder(self, pOrder: thosttraderapi.CThostFtdcOrderField):
         if not pOrder or not pOrder.OrderSysID:
             return
-        dt = datetime.strptime(pOrder.TradingDay + pOrder.UpdateTime, '%Y%m%d%H:%M:%S').strftime('%Y-%m-%d %H:%M:%S')
-        self.broker.on_order(oid=pOrder.ExchangeID + pOrder.OrderSysID, datetime=dt, symbol=pOrder.InstrumentID, order_ref=pOrder.OrderRef, order_sys_id=pOrder.OrderSysID, exchange_id=pOrder.ExchangeID, side=pOrder.Direction, price=pOrder.LimitPrice, volume=pOrder.VolumeTotalOriginal, status=pOrder.OrderStatus)
+        self.broker.on_order(exchange_id=pOrder.ExchangeID, order_sys_id=pOrder.OrderSysID, insert_date=pOrder.InsertDate, update_time=pOrder.UpdateTime, symbol=pOrder.InstrumentID, flag=pOrder.CombOffsetFlag, side=pOrder.Direction, price=pOrder.LimitPrice, volume=pOrder.VolumeTotalOriginal, status=pOrder.OrderStatus)
 
     @exception_catcher
     def OnRtnTrade(self, pTrade: thosttraderapi.CThostFtdcTradeField):
         if not pTrade:
             return
-        dt = datetime.strptime(pTrade.TradeDate + pTrade.TradeTime, '%Y%m%d%H:%M:%S').strftime('%Y-%m-%d %H:%M:%S')
-        self.broker.on_trade(tid=pTrade.ExchangeID + pTrade.TradeID, datetime=dt, trade_id=pTrade.TradeID, order_id=pTrade.ExchangeID + pTrade.OrderSysID, symbol=pTrade.InstrumentID, exchange_id=pTrade.ExchangeID, flag=pTrade.OffsetFlag, side=pTrade.Direction, price=pTrade.Price, volume=pTrade.Volume)
+        self.broker.on_trade(trade_id=pTrade.TradeID, trade_date=pTrade.TradeDate, trade_time=pTrade.TradeTime, exchange_id=pTrade.ExchangeID, order_sys_id=pTrade.OrderSysID, symbol=pTrade.InstrumentID, flag=pTrade.OffsetFlag, side=pTrade.Direction, price=pTrade.Price, volume=pTrade.Volume)
 
     @exception_catcher
     def OnRspError(self, pRspInfo: thosttraderapi.CThostFtdcRspInfoField, nRequestId: int, bIsLast: bool):

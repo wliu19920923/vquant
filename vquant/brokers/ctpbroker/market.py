@@ -1,4 +1,4 @@
-from server_check import check_address_port
+from vquant.utils.server_check import check_address_port
 from vquant.utils import exception_catcher
 from vquant.utils.logger import get_logger
 from vquant.library.ctp.win64 import thostmduserapi

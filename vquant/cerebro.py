@@ -1,6 +1,5 @@
 import pandas
 from vquant.analyzers import Analyzer
-from vquant.brokers import Order
 from matplotlib import pyplot
 
 
@@ -26,6 +25,10 @@ class Cerebro(object):
         for strategy in self.strategies:
             strategy.notify_trade(trade)
 
+    def notify_position(self, position):
+        for strategy in self.strategies:
+            strategy.notify_position(position)
+
     def notify_profit(self, profit):
         for strategy in self.strategies:
             strategy.notify_profit(profit)
@@ -35,8 +38,8 @@ class Cerebro(object):
         results['value'] = self.broker.value
         results['init_cash'] = self.broker.init_cash
         results['profit'] = self.broker.value - self.broker.init_cash
-        results['buy_signal'] = self.broker.store.trades.loc[(self.broker.store.trades['flag'] == Order.Open) & (self.broker.store.trades['side'] == Order.Buy)].shape[0]
-        results['sell_signal'] = self.broker.store.trades.loc[(self.broker.store.trades['flag'] == Order.Open) & (self.broker.store.trades['side'] == Order.Sell)].shape[0]
+        results['buy_signal'] = self.broker.store.trades.loc[(self.broker.store.trades['flag'] == self.broker.Order.Open) & (self.broker.store.trades['side'] == self.broker.Order.Buy)].shape[0]
+        results['sell_signal'] = self.broker.store.trades.loc[(self.broker.store.trades['flag'] == self.broker.Order.Open) & (self.broker.store.trades['side'] == self.broker.Order.Sell)].shape[0]
         results['trades'] = self.broker.store.trades.to_dict(orient='records')
         return results
 

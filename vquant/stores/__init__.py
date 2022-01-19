@@ -1,5 +1,4 @@
 import pandas
-from vquant.brokers import Order
 
 
 class OrderStore(pandas.DataFrame):
@@ -61,17 +60,17 @@ class Store(object):
         else:
             self.positions = self.positions.append([position], ignore_index=True)
 
-    def insert_profit(self, profit):
-        self.profits = self.profits.append([profit], ignore_index=True)
-
     def insert_trade(self, trade):
         self.trades = self.trades.append([trade], ignore_index=True)
 
-    def query_orders(self, symbol, side):
-        return self.orders.loc[(self.orders['symbol'] == symbol) & (self.orders['side'] == side) & self.orders['status'].isin([Order.Created, Order.Submitted, Order.Accepted, Order.Partial])]
+    def insert_value(self, value):
+        self.values = self.values.append([value], ignore_index=True)
+
+    def insert_profit(self, profit):
+        self.profits = self.profits.append([profit], ignore_index=True)
 
     def query_position(self, symbol, direction):
         return self.positions.loc[(self.positions['symbol'] == symbol) & (self.positions['direction'] == direction)]
 
-    def insert_value(self, value):
-        self.values = self.values.append([value], ignore_index=True)
+    def query_orders(self, symbol, side, status):
+        return self.orders.loc[(self.orders['symbol'] == symbol) & (self.orders['side'] == side) & self.orders['status'].isin(status)]
