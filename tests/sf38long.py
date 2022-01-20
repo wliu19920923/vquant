@@ -113,6 +113,5 @@ if __name__ == '__main__':
     data = CSVRead('../datas/RB0_30m.csv').data
     cerebro.add_data(data)
     cerebro.add_strategy(SF38LongStrategy)
-    r = cerebro.run()
-    print(r)
-    cerebro.show(r)
+    analyzer = cerebro.run()
+    print(analyzer.results)

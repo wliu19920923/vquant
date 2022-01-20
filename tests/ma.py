@@ -54,6 +54,5 @@ if __name__ == '__main__':
     data = CSVRead('../datas/2006day1.csv').data
     cerebro.add_data(data)
     cerebro.add_strategy(MAStrategy)
-    r = cerebro.run()
-    print(r)
-    cerebro.show(r)
+    analyzer = cerebro.run()
+    print(analyzer.results)

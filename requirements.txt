@@ -4,3 +4,6 @@ empyrical
 matlibplot
 numpy
 pandas
+pyfolio
+zipline
+websocket-client

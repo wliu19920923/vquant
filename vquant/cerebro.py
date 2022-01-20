@@ -1,6 +1,5 @@
 import pandas
 from vquant.analyzers import Analyzer
-from matplotlib import pyplot
 
 
 class Cerebro(object):
@@ -8,6 +7,7 @@ class Cerebro(object):
         self.datas = list()
         self.strategies = list()
         self.broker = broker(self)
+        self.index = None
 
     def add_data(self, data):
         data['index'] = pandas.to_datetime(data['datetime'])
@@ -33,23 +33,6 @@ class Cerebro(object):
         for strategy in self.strategies:
             strategy.notify_profit(profit)
 
-    def analyze(self):
-        results = Analyzer(self.broker.store.values).results()
-        results['value'] = self.broker.value
-        results['init_cash'] = self.broker.init_cash
-        results['profit'] = self.broker.value - self.broker.init_cash
-        results['buy_signal'] = self.broker.store.trades.loc[(self.broker.store.trades['flag'] == self.broker.Order.Open) & (self.broker.store.trades['side'] == self.broker.Order.Buy)].shape[0]
-        results['sell_signal'] = self.broker.store.trades.loc[(self.broker.store.trades['flag'] == self.broker.Order.Open) & (self.broker.store.trades['side'] == self.broker.Order.Sell)].shape[0]
-        results['trades'] = self.broker.store.trades.to_dict(orient='records')
-        return results
-
-    def show(self, results):
-        data = results['values']
-        x = [i['datetime'] for i in data]
-        y = [i['value'] for i in data]
-        pyplot.plot(x, y)
-        pyplot.show()
-
     def run(self):
         self.index = self.datas[0].iloc[0].datetime
         for row in self.datas[0].itertuples():
@@ -57,4 +40,4 @@ class Cerebro(object):
             for strategy in self.strategies:
                 strategy.next()
             self.broker.settlement()
-        return self.analyze()
+        return Analyzer(self.broker)
