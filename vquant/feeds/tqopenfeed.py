@@ -4,7 +4,7 @@ import websocket
 from datetime import datetime
 
 
-class TianQingOpenFeed(object):
+class TianQinOpenFeed(object):
     ws_url = 'wss://openmd.shinnytech.com/t/md/front/mobile'
     fields = ['datetime', 'open', 'high', 'low', 'close', 'volume']
     duration = 60000000000
@@ -13,15 +13,6 @@ class TianQingOpenFeed(object):
         self.ins = '%s.%s' % (exchange.upper(), symbol)
         self.data = pandas.DataFrame(columns=self.fields)
         self.callback = callback
-
-    def request_kline(self, ws):
-        ws.send(json.dumps({
-            'aid': 'set_chart',
-            'chart_id': 'PC_kline_chart',
-            'ins_list': self.ins,
-            'duration': self.duration,
-            'view_width': 2000
-        }))
 
     def update_or_insert_kline(self, kline, is_last):
         values = [
@@ -37,14 +28,14 @@ class TianQingOpenFeed(object):
         if is_last:
             self.callback(values[0])
 
-    def analytical_kline(self, data):
-        for item in data:
-            if 'klines' in item:
-                klines = item['klines'][self.ins][self.duration]
-                is_last = len(klines) == 1
-                for kline in klines:
-                    self.update_or_insert_kline(kline, is_last)
-                break
+    def analytical_kline(self, tick):
+        try:
+            klines = tick['data'][0]['klines'][self.ins][str(self.duration)]['data']
+            is_last = len(klines) == 1
+            for kline in klines.values():
+                self.update_or_insert_kline(kline, is_last)
+        except Exception as exp:
+            print(exp)
 
     @staticmethod
     def on_pong(ws):
@@ -53,14 +44,18 @@ class TianQingOpenFeed(object):
         }))
 
     def on_open(self, ws):
-        self.on_pong(ws)
+        ws.send(json.dumps({
+            'aid': 'set_chart',
+            'chart_id': 'PC_kline_chart',
+            'ins_list': self.ins,
+            'duration': self.duration,
+            'view_width': 2000
+        }))
 
     def on_message(self, ws, message):
-        self.on_pong(ws)
         tick = json.loads(message)
-        if 'data' in tick and isinstance(tick['data'], list):
-            self.analytical_kline(tick['data'])
-        self.request_kline(ws)
+        self.analytical_kline(tick)
+        self.on_pong(ws)
 
     def on_error(self, _, error):
         error_exp = type(error)
@@ -81,3 +76,13 @@ class TianQingOpenFeed(object):
             on_close=self.on_close
         )
         ws.run_forever()
+
+
+if __name__ == '__main__':
+    def msg(msg):
+        print(msg)
+        print(tf.data)
+
+
+    tf = TianQinOpenFeed('CFFEX', 'IF2201', msg)
+    tf.connect()

@@ -105,13 +105,13 @@ class SF38ShortStrategy(Strategy):
 if __name__ == '__main__':
     from vquant.cerebro import Cerebro
     from vquant.brokers import BackBroker
-    from vquant.feeds.csvread import CSVRead
+    from vquant.feeds.readcsv import ReadCSV
 
     cerebro = Cerebro(broker=BackBroker)
     symbol_info = SymbolInfo(commission_rate=0.0003, margin_rate=0.09, volume_multiple=100, price_tick=1, exchange_id='SHFE', target_index=0)
     cerebro.broker.add_symbol('j0', symbol_info)
     cerebro.broker.set_cash(1000000)
-    data = CSVRead('../datas/RB0_30m.csv').data
+    data = ReadCSV('../datas/RB0_30m.csv').data
     cerebro.add_data(data)
     cerebro.add_strategy(SF38ShortStrategy)
     analyzer = cerebro.run()

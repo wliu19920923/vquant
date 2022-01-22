@@ -38,6 +38,14 @@ class Strategy(object):
         side = self.broker.Order.Sell if direction == self.broker.Position.Long else self.broker.Order.Buy
         return self.broker.create_order(self.datetime, symbol, self.broker.Order.Close, side, self.price, volume)
 
+    def close_today(self, symbol, direction, volume):
+        side = self.broker.Order.Sell if direction == self.broker.Position.Long else self.broker.Order.Buy
+        return self.broker.create_order(self.datetime, symbol, self.broker.Order.CloseToday, side, self.price, volume)
+
+    def close_yesterday(self, symbol, direction, volume):
+        side = self.broker.Order.Sell if direction == self.broker.Position.Long else self.broker.Order.Buy
+        return self.broker.create_order(self.datetime, symbol, self.broker.Order.CloseYesterday, side, self.price, volume)
+
     def log(self, txt):
         pass
 

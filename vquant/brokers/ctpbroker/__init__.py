@@ -37,13 +37,11 @@ class CtpBroker(object):
         Partial = thosttraderapi.THOST_FTDC_OST_PartTradedQueueing
         Canceled = thosttraderapi.THOST_FTDC_OST_Canceled
         Expired = thosttraderapi.THOST_FTDC_OST_PartTradedNotQueueing
-        Margin = thosttraderapi.THOST_FTDC_OST_Canceled
-        Rejected = thosttraderapi.THOST_FTDC_OST_Canceled
         NotTouched = thosttraderapi.THOST_FTDC_OST_NotTouched
         Touched = thosttraderapi.THOST_FTDC_OST_Touched
         Status = {
             Created: 'Created', Submitted: 'Submitted', Accepted: 'Accepted', Completed: 'Completed', Partial: 'Partial', Canceled: 'Canceled',
-            Expired: 'Expired', Margin: 'Margin', Rejected: 'Rejected', NotTouched: 'NotTouched', Touched: 'Touched'
+            Expired: 'Expired', NotTouched: 'NotTouched', Touched: 'Touched'
         }
 
         def __init__(self, exchange_id, order_sys_id, insert_date, update_time, symbol, flag, side, price, volume, status, commission, margin):
@@ -253,6 +251,41 @@ class CtpBroker(object):
         self.store.insert_profit(profit.__dict__())
         self.cerebro.notify_profit(profit)
 
+    @staticmethod
+    def in_shanghai(exchange):
+        return exchange in ('SHFE', 'INE')
+
+    def close(self, exchange, symbol, side, price, volume):
+        if self.in_shanghai(exchange):
+            direction = self.Position.Short if side == self.Order.Buy else self.Position.Long
+            position = self.get_position(symbol, direction)
+            if position.yesterday_volume > volume:
+                self.ticker.create_order(exchange, symbol, self.Order.CloseYesterday, side, price, volume)
+            else:
+                self.ticker.create_order(exchange, symbol, self.Order.CloseYesterday, side, price, position.yesterday_volume)
+                self.ticker.create_order(exchange, symbol, self.Order.CloseToday, side, price, volume - position.yesterday_volume)
+        else:
+            self.ticker.create_order(exchange, symbol, self.Order.Close, side, price, volume)
+
+    def close_today(self, exchange, symbol, side, price, volume):
+        if self.in_shanghai(exchange):
+            self.ticker.create_order(exchange, symbol, self.Order.CloseToday, side, price, volume)
+        else:
+            self.ticker.create_order(exchange, symbol, self.Order.Close, side, price, volume)
+
+    def close_yesterday(self, exchange, symbol, side, price, volume):
+        if self.in_shanghai(exchange):
+            self.ticker.create_order(exchange, symbol, self.Order.CloseYesterday, side, price, volume)
+        else:
+            self.ticker.create_order(exchange, symbol, self.Order.Close, side, price, volume)
+
     def create_order(self, _, symbol, flag, side, price, volume):
-        exchange_id = self.symbols[symbol]['exchange_id']
-        self.ticker.create_order(exchange_id, symbol, flag, side, price, volume)
+        exchange = self.symbols[symbol]['exchange_id']
+        if flag == self.Order.Close:
+            self.close(exchange, symbol, side, price, volume)
+        elif flag == self.Order.CloseToday:
+            self.close_today(exchange, symbol, side, price, volume)
+        elif flag == self.Order.CloseYesterday:
+            self.close_yesterday(exchange, symbol, side, price, volume)
+        else:
+            self.ticker.create_order(exchange, symbol, flag, side, price, volume)
