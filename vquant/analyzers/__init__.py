@@ -1,7 +1,5 @@
 import empyrical
 import pandas
-# import pyfolio
-# from matplotlib import pyplot
 
 
 class Analyzer(object):

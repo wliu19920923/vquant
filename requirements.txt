@@ -1,9 +1,8 @@
 aiohttp
 cacheout
 empyrical
-matlibplot
 numpy
 pandas
 pyfolio
-zipline
+requests
 websocket-client
