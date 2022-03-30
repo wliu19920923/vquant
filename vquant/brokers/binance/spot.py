@@ -5,6 +5,7 @@ import requests
 from cacheout import LFUCache
 from datetime import datetime
 from urllib.parse import urlencode
+from vquant.utils import RequestMethod
 
 
 class BinanceSpotBroker(object):
@@ -76,7 +77,7 @@ class BinanceSpotBroker(object):
         return params
 
     def balance(self):
-        response = self.http_requests('GET', '/api/v3/account', self.sign())
+        response = self.http_requests(RequestMethod.GET, '/api/v3/account', self.sign())
         return {i['asset'].lower(): {
             'available': float(i['free']),
             'frozen': float(i['locked']),
@@ -84,7 +85,7 @@ class BinanceSpotBroker(object):
         } for i in response['balances']}
 
     def create_order(self, symbol, side, price, amount):
-        response = self.http_requests('POST', '/api/v3/order', self.sign({
+        response = self.http_requests(RequestMethod.POST, '/api/v3/order', self.sign({
             'symbol': self.convert_symbol(symbol),
             'side': side == 'bid' and 'BUY' or 'SELL',
             'price': self.num_decimal_string(price),
@@ -95,21 +96,21 @@ class BinanceSpotBroker(object):
         return response.get('orderId')
 
     def cancel_order(self, symbol, order_id):
-        response = self.http_requests('DELETE', '/api/v3/order', self.sign({
+        response = self.http_requests(RequestMethod.DELETE, '/api/v3/order', self.sign({
             'symbol': self.convert_symbol(symbol),
             'orderId': int(order_id)
         }))
         return response.get('status') == 'CANCELED'
 
     def order_detail(self, symbol, order_id):
-        response = self.http_requests('GET', '/api/v3/order', self.sign({
+        response = self.http_requests(RequestMethod.GET, '/api/v3/order', self.sign({
             'symbol': self.convert_symbol(symbol),
             'orderId': order_id
         }))
-        return self.Order(str(response['orderId']), datetime.fromtimestamp(response['time'] / 1000), symbol, self.Order.Open, response['side'], float(response['price']), float(response['origQty']), response['status'])
+        return self.Order(str(response['orderId']), datetime.fromtimestamp(response['time'] / 1000), symbol, self.Order.Open, response['side'], float(response['price']), float(response['origQty']), response['status'], 0, self.Order.Created)
 
     def active_orders(self, symbol, page=1, limit=100):
-        response = self.http_requests('GET', '/api/v3/openOrders', self.sign({
+        response = self.http_requests(RequestMethod.GET, '/api/v3/openOrders', self.sign({
             'symbol': symbol
         }))
         return [self.order_format(symbol, order) for order in response]
