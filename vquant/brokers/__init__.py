@@ -1,6 +1,6 @@
 import os
 import binascii
-from datetime import datetime
+from dateutil.parser import parse
 from vquant.stores import Store
 
 
@@ -164,13 +164,13 @@ class BackBroker(object):
     def prices(self):
         return {symbol: self.cerebro.datas[self.symbols[symbol].target_index].loc[self.cerebro.index].close for symbol in self.symbols}
 
-    def previous_trading_day(self, target_index):
-        data = self.cerebro.datas[target_index].loc[:self.cerebro.index]
-        return datetime.strptime(data.iloc[-2].datetime, '%Y-%m-%d %H:%M:%S').day
-
     @property
     def current_trading_day(self):
-        return datetime.strptime(self.cerebro.index, '%Y-%m-%d %H:%M:%S').day
+        return parse(self.cerebro.index).day
+
+    def previous_trading_day(self, target_index):
+        data = self.cerebro.datas[target_index].loc[:self.cerebro.index]
+        return parse(data.iloc[-2].datetime).day
 
     def on_value(self, value, benchmark_value):
         self.value = value

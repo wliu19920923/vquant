@@ -4,5 +4,6 @@ empyrical
 numpy
 pandas
 pyfolio
+python-dateutil
 requests
 websocket-client

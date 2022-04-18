@@ -3,13 +3,13 @@ from vquant.strategy import Strategy
 from vquant.indicators import Indicator
 
 
-class MAStrategy(Strategy):
+class CrossStrategy(Strategy):
     _params = (
         ('symbol', 'j0'),
     )
 
     def __init__(self, cerebro):
-        super(MAStrategy, self).__init__(cerebro)
+        super(CrossStrategy, self).__init__(cerebro)
         self.datas[0] = Indicator(self.datas[0]).ma(7)
         self.datas[0] = Indicator(self.datas[0]).ma(30)
 
@@ -53,6 +53,6 @@ if __name__ == '__main__':
     cerebro.broker.set_cash(1000000)
     data = ReadCSV('../datas/2006day1.csv').data
     cerebro.add_data(data)
-    cerebro.add_strategy(MAStrategy)
+    cerebro.add_strategy(CrossStrategy)
     analyzer = cerebro.run()
     print(analyzer.results)

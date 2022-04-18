@@ -3,6 +3,8 @@ import pandas
 import websocket
 from datetime import datetime
 
+BaseDuration = 60000000000
+
 
 class TianQinOpenFeed(object):
     ws_url = 'wss://openmd.shinnytech.com/t/md/front/mobile'
@@ -30,6 +32,7 @@ class TianQinOpenFeed(object):
 
     def analytical_kline(self, tick):
         try:
+            print(tick)
             klines = tick['data'][0]['klines'][self.ins][str(self.duration)]['data']
             is_last = len(klines) == 1
             for kline in klines.values():
@@ -84,5 +87,5 @@ if __name__ == '__main__':
         print(tf.data)
 
 
-    tf = TianQinOpenFeed('CFFEX', 'IF2201', msg)
+    tf = TianQinOpenFeed('CFFEX', 'IF2206', msg)
     tf.connect()
