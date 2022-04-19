@@ -32,7 +32,6 @@ class TianQinOpenFeed(object):
 
     def analytical_kline(self, tick):
         try:
-            print(tick)
             klines = tick['data'][0]['klines'][self.ins][str(self.duration)]['data']
             is_last = len(klines) == 1
             for kline in klines.values():

@@ -8,7 +8,7 @@ logging.basicConfig(
 )
 
 
-def get_logger(name):
+def getFileLogger(name):
     file_handler = logging.FileHandler('%s.log' % name)
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(logging.Formatter('%(asctime)s %(filename)s[line:%(lineno)d] - %(levelname)s: %(message)s'))

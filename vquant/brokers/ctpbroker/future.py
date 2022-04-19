@@ -2,8 +2,8 @@ from datetime import datetime
 from vquant.brokers import Profit
 from vquant.stores.ctpstore import Store
 from vquant.library.ctp.win64 import thostmduserapi, thosttraderapi
-from vquant.utils import exception_catcher
-from vquant.utils.logger import get_logger
+from vquant.utils.catcher import exception_catcher
+from vquant.utils.logger import getFileLogger
 from vquant.utils.server_check import check_address_port
 
 
@@ -138,7 +138,7 @@ class MarketApi(thostmduserapi.CThostFtdcMdSpi):
     def __init__(self, on_tick):
         thostmduserapi.CThostFtdcMdSpi.__init__(self)
         self.api = thostmduserapi.CThostFtdcMdApi_CreateFtdcMdApi()
-        self.logger = get_logger('CTPMarket')
+        self.logger = getFileLogger('CTPMarket')
         self.subscribedContracts = list()
         self.nRequestId = 0
         self.on_tick = on_tick
@@ -259,7 +259,7 @@ class TraderApi(thosttraderapi.CThostFtdcTraderSpi):
         self.investor_id = investor_id
         self.password = password
         self._request_id = 0
-        self.logger = get_logger('CTPTrader')
+        self.logger = getFileLogger('CTPTrader')
         self.front_id = 0
         self.session_id = 0
         self.trading_day = None

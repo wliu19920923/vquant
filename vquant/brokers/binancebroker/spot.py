@@ -5,6 +5,7 @@ from cacheout import LFUCache
 from datetime import datetime
 from urllib.parse import urlencode
 from vquant.utils.request import Request
+from vquant.utils.timeutil import millisecond_to_str_time
 
 BinanceBaseURL = 'https://api3.binance.com'
 
@@ -31,6 +32,60 @@ class Order(object):
         self.margin = margin
         self.status = status
 
+    def __dict__(self):
+        return {
+            'id': self.id,
+            'datetime': self.datetime,
+            'symbol': self.symbol,
+            'flag': self.flag,
+            'side': self.side,
+            'price': self.price,
+            'volume': self.volume,
+            'commission': self.commission,
+            'margin': self.margin,
+            'status': self.status
+        }
+
+
+class Trade(object):
+    def __init__(self, dt, trade_id, order_id, symbol, flag, side, price, volume, profit):
+        self.id = trade_id
+        self.datetime = dt
+        self.order_id = order_id
+        self.symbol = symbol
+        self.flag = flag
+        self.side = side
+        self.price = price
+        self.volume = volume
+        self.profit = profit
+
+    def __dict__(self):
+        return {
+            'id': self.id,
+            'datetime': self.datetime,
+            'order_id': self.order_id,
+            'symbol': self.symbol,
+            'flag': self.flag,
+            'side': self.side,
+            'price': self.price,
+            'volume': self.volume,
+            'profit': self.profit
+        }
+
+
+class Position(object):
+    def __init__(self, symbol, cost, volume):
+        self.symbol = symbol
+        self.cost = cost
+        self.volume = volume
+
+    def __dict__(self):
+        return {
+            'symbol': self.symbol,
+            'cost': self.cost,
+            'volume': self.volume,
+        }
+
 
 class WebsocketStream(object):
     def __init__(self, access_key):
@@ -53,6 +108,15 @@ class WebsocketStream(object):
         if self.listen_key_expired_time - now <= 60:
             self.extend_listen_key_time()
         return self.listen_key
+
+    def on_open(self, ws):
+        pass
+
+    def on_message(self, ws, message):
+        pass
+
+    def start(self):
+        pass
 
 
 class BinanceSpotBroker(object):
@@ -83,7 +147,7 @@ class BinanceSpotBroker(object):
         return params
 
     def balance(self):
-        response = self.http_requests(RequestMethod.GET, '/api/v3/account', params=self.sign())
+        response = Request.http_requests(Request.GET, BinanceBaseURL + '/api/v3/account', params=self.sign())
         return {i['asset'].lower(): {
             'available': float(i['free']),
             'frozen': float(i['locked']),
@@ -91,7 +155,7 @@ class BinanceSpotBroker(object):
         } for i in response['balances']}
 
     def create_order(self, symbol, side, price, amount):
-        response = self.http_requests(RequestMethod.POST, '/api/v3/order', params=self.sign({
+        response = Request.http_requests(Request.POST, BinanceBaseURL + '/api/v3/order', params=self.sign({
             'symbol': self.convert_symbol(symbol),
             'side': side == 'bid' and 'BUY' or 'SELL',
             'price': self.num_decimal_string(price),
@@ -102,25 +166,42 @@ class BinanceSpotBroker(object):
         return response.get('orderId')
 
     def cancel_order(self, symbol, order_id):
-        response = self.http_requests(RequestMethod.DELETE, '/api/v3/order', params=self.sign({
+        response = Request.http_requests(Request.DELETE, BinanceBaseURL + '/api/v3/order', params=self.sign({
             'symbol': self.convert_symbol(symbol),
             'orderId': int(order_id)
         }))
         return response.get('status') == Order.Canceled
 
+    def cancel_all_order(self, symbol):
+        response = Request.http_requests(Request.DELETE, BinanceBaseURL + '/api/v3/openOrders', params=self.sign({
+            'symbol': self.convert_symbol(symbol)
+        }))
+        return [Order(
+            dt=datetime.fromtimestamp(order['time'] / 1000),
+            oid=str(order['orderId']),
+            flag=Order.Open,
+            symbol=symbol,
+            side=Order.Buy if order['side'] == 'BUY' else Order.Sell,
+            price=float(order['price']),
+            volume=float(order['origQty']),
+            commission=0,
+            margin=0,
+            status=order['status']
+        ) for order in response]
+
     def order_detail(self, symbol, order_id):
-        response = self.http_requests(RequestMethod.GET, '/api/v3/order', params=self.sign({
+        response = Request.http_requests(Request.GET, BinanceBaseURL + '/api/v3/order', params=self.sign({
             'symbol': self.convert_symbol(symbol),
             'orderId': order_id
         }))
         return Order(str(response['orderId']), datetime.fromtimestamp(response['time'] / 1000), symbol, Order.Open, response['side'], float(response['price']), float(response['origQty']), response['status'], 0, Order.Created)
 
     def active_orders(self, symbol):
-        response = self.http_requests(RequestMethod.GET, '/api/v3/openOrders', params=self.sign({
+        response = Request.http_requests(Request.GET, BinanceBaseURL + '/api/v3/openOrders', params=self.sign({
             'symbol': symbol
         }))
         return [Order(
-            dt=datetime.fromtimestamp(order['time'] / 1000),
+            dt=millisecond_to_str_time(order['time']),
             oid=order['orderId'],
             flag=Order.Open,
             symbol=symbol,
@@ -131,3 +212,19 @@ class BinanceSpotBroker(object):
             margin=0,
             status=order['status']
         ) for order in response]
+
+    def history_trades(self, symbol):
+        response = await Request.http_requests(Request.GET, '/api/v3/myTrades', params=self.sign({
+            'symbol': self.convert_symbol(symbol),
+            'limit': 1000
+        }))
+        return [Trade(
+            dt=millisecond_to_str_time(trade['time']),
+            trade_id=trade['id'],
+            order_id=trade['orderId'],
+            symbol=symbol,
+            flag=Order.Open,
+            side=Order.Buy if trade['isBuyer'] else Order.Sell,
+            price=self.num_decimal_string(trade['price']),
+            volume=self.num_decimal_string(trade['qty'])
+        ) for trade in response]

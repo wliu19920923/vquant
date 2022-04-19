@@ -6,9 +6,7 @@ class Request:
 
     @staticmethod
     def http_requests(method, url, **kwargs):
-        params = kwargs.get('params') or dict()
-        headers = kwargs.get('headers')
-        response = requests.request(method, url, params=params, headers=headers)
+        response = requests.request(method, url, **kwargs)
         try:
             result = response.json()
         except Exception as exp:
