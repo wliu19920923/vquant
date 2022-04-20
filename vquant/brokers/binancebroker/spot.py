@@ -1,6 +1,8 @@
 import hmac
+import json
 import time
 import hashlib
+import websocket
 from cacheout import LFUCache
 from datetime import datetime
 from urllib.parse import urlencode
@@ -8,6 +10,7 @@ from vquant.utils.request import Request
 from vquant.utils.timeutil import millisecond_to_str_time
 
 BinanceBaseURL = 'https://api3.binance.com'
+BinanceSocketURL = 'wss://stream.binance.com:9443'
 
 
 class Order(object):
@@ -88,35 +91,73 @@ class Position(object):
 
 
 class WebsocketStream(object):
+    listen_key_duration = 60 * 60
+
     def __init__(self, access_key):
-        self.listen_key = None
-        self.listen_key_expired_time = time.time()
+        self.ws_url = '%s/stream?streams=%s' % (BinanceSocketURL, self.get_listen_key())
+        self.listen_key = self.get_listen_key()
+        self.listen_key_expired_time = time.time() + self.listen_key_duration
         self.http_headers = {
             'X-MBX-APIKEY': access_key
         }
 
     def extend_listen_key_time(self):
+        now = time.time()
+        if self.listen_key_expired_time - now >= 60:
+            return
         params = dict(listenKey=self.listen_key)
         Request.http_requests(Request.PUT, BinanceBaseURL + '/api/v3/userDataStream', params=params, headers=self.http_headers)
+        self.listen_key_expired_time = now + self.listen_key_duration
 
     def get_listen_key(self):
-        now = time.time()
-        if not self.listen_key:
-            response = Request.http_requests(Request.POST, BinanceBaseURL + '/api/v3/userDataStream', headers=self.http_headers)
-            self.listen_key = response.get('listenKey')
-            self.listen_key_expired_time = now + 60 * 60
-        if self.listen_key_expired_time - now <= 60:
-            self.extend_listen_key_time()
-        return self.listen_key
+        response = Request.http_requests(Request.POST, BinanceBaseURL + '/api/v3/userDataStream', headers=self.http_headers)
+        return response.get('listenKey')
+
+    def balanceUpdate(self, data):
+        pass
+
+    def executionReport(self, data):
+        pass
+
+    def outboundAccountPosition(self, data):
+        pass
 
     def on_open(self, ws):
         pass
 
     def on_message(self, ws, message):
-        pass
+        try:
+            stream = json.loads(message)
+            if 'ping' in stream:
+                ws.send(json.dumps({
+                    'pong': stream['ping']
+                }))
+            else:
+                event = stream.get('e')
+                function = getattr(self, event)
+                function(stream)
+        except Exception as exp:
+            print(exp)
+        self.extend_listen_key_time()
 
-    def start(self):
-        pass
+    def on_error(self, _, error):
+        error_exp = type(error)
+        if error_exp in (ConnectionRefusedError, websocket.WebSocketConnectionClosedException):
+            self.connect()
+        raise error_exp
+
+    def on_close(self, _, close_status_code, close_msg):
+        raise ConnectionError(close_status_code, close_msg)
+
+    def connect(self):
+        ws = websocket.create_connection(
+            url=self.ws_url,
+            on_open=self.on_open,
+            on_message=self.on_message,
+            on_error=self.on_error,
+            on_close=self.on_close
+        )
+        ws.run_forever()
 
 
 class BinanceSpotBroker(object):
@@ -226,5 +267,6 @@ class BinanceSpotBroker(object):
             flag=Order.Open,
             side=Order.Buy if trade['isBuyer'] else Order.Sell,
             price=self.num_decimal_string(trade['price']),
-            volume=self.num_decimal_string(trade['qty'])
+            volume=self.num_decimal_string(trade['qty']),
+            profit=0,
         ) for trade in response]

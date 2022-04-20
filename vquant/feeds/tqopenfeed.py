@@ -69,7 +69,6 @@ class TianQinOpenFeed(object):
         raise ConnectionError(close_status_code, close_msg)
 
     def connect(self):
-        websocket.enableTrace(True)
         ws = websocket.WebSocketApp(
             self.ws_url,
             on_open=self.on_open,
