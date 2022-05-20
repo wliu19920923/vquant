@@ -1,6 +1,6 @@
 from datetime import datetime
 from vquant.brokers import Profit
-from vquant.stores.ctpstore import Store
+from vquant.stores.ctpstore import CtpStore
 from vquant.library.ctp.win64 import thostmduserapi, thosttraderapi
 from vquant.utils.catcher import exception_catcher
 from vquant.utils.logger import getFileLogger
@@ -391,7 +391,7 @@ class CtpFutureBroker(object):
         self.frozen = 0
         self.profit = 0
         self.symbols = dict()
-        self.store = Store()
+        self.store = CtpStore()
 
     @property
     def is_logged(self):

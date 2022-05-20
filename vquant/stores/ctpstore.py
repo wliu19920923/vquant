@@ -46,7 +46,7 @@ class ValueStore(pandas.DataFrame):
         super(ValueStore, self).__init__(columns=self.fields)
 
 
-class Store(object):
+class CtpStore(object):
     def __init__(self):
         self.orders = OrderStore()
         self.trades = TradeStore()
