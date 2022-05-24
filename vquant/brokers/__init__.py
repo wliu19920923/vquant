@@ -288,7 +288,7 @@ class BackBroker(object):
                     self.create_order(self.cerebro.index, row.symbol, Order.Close, Order.Buy, self.prices[row.symbol], row.volume)
                     self.create_order(self.cerebro.index, row.symbol, Order.Open, Order.Sell, self.prices[row.symbol], row.volume)
 
-    def settlement(self):
+    def on_next(self):
         profit = 0
         self.move_positions()
         positions = self.store.positions.loc[self.store.positions['volume'] > 0]

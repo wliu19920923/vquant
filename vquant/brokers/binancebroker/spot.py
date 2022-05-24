@@ -39,20 +39,6 @@ class Order(object):
         self.margin = margin
         self.status = status
 
-    def __dict__(self):
-        return {
-            'id': self.id,
-            'datetime': self.datetime,
-            'symbol': self.symbol,
-            'flag': self.flag,
-            'side': self.side,
-            'price': self.price,
-            'volume': self.volume,
-            'commission': self.commission,
-            'margin': self.margin,
-            'status': self.status
-        }
-
 
 class Trade(object):
     def __init__(self, dt, trade_id, order_id, symbol, flag, side, price, volume, profit):
@@ -66,19 +52,6 @@ class Trade(object):
         self.volume = volume
         self.profit = profit
 
-    def __dict__(self):
-        return {
-            'id': self.id,
-            'datetime': self.datetime,
-            'order_id': self.order_id,
-            'symbol': self.symbol,
-            'flag': self.flag,
-            'side': self.side,
-            'price': self.price,
-            'volume': self.volume,
-            'profit': self.profit
-        }
-
 
 class Position(object):
     def __init__(self, symbol, cost, volume):
@@ -86,16 +59,10 @@ class Position(object):
         self.cost = cost
         self.volume = volume
 
-    def __dict__(self):
-        return {
-            'symbol': self.symbol,
-            'cost': self.cost,
-            'volume': self.volume,
-        }
-
 
 class BinanceSpotBroker(object):
-    listen_key_duration = 60 * 60
+    QuoteAsset = 'USDT'
+    ListenKeyDuration = 60 * 60
 
     def __init__(self, cerebro, **kwargs):
         self.cache = LFUCache()
@@ -103,7 +70,7 @@ class BinanceSpotBroker(object):
         self.assets = dict()
         self.cerebro = cerebro
         self.listen_key = self.get_listen_key()
-        self.listen_key_expired_time = time.time() + self.listen_key_duration
+        self.listen_key_expired_time = time.time() + self.ListenKeyDuration
         self.access_key = kwargs.get('access_key')
         self.secret_key = kwargs.get('secret_key')
         self.cash = 0
@@ -227,25 +194,29 @@ class BinanceSpotBroker(object):
             return
         params = dict(listenKey=self.listen_key)
         self.http_requests(Request.PUT, '/api/v3/userDataStream', params=params)
-        self.listen_key_expired_time = now + self.listen_key_duration
+        self.listen_key_expired_time = now + self.ListenKeyDuration
 
     def on_value(self, value):
         self.store.insert_value(value)
 
-    def on_asset(self):
-        pass
+    def on_asset(self, value):
+        self.cash = value
 
-    def on_order(self, order):
+    def on_order(self, order: Order):
         self.store.update_or_insert_order(order.__dict__())
         self.cerebro.notify_order(order)
 
+    def on_position(self, position: Position):
+        self.store.update_or_insert_position(position.__dict__())
+
     def balanceUpdate(self, data):
         # dt, oid, symbol, flag, side, price, volume, commission, margin, status
-        order = Order(millisecond_to_str_time(data['O']), data['i'], data['s'], Order.Open, data['S'], float(data['p']), float(data['q']), float(data['n']), 0, data['X'])
-        self.on_order(order)
+        if data['a'] == self.QuoteAsset:
+            self.on_asset(float(data['d']))
 
     def executionReport(self, data):
-        pass
+        order = Order(millisecond_to_str_time(data['O']), data['i'], data['s'], Order.Open, data['S'], float(data['p']), float(data['q']), float(data['n']), 0, data['X'])
+        self.on_order(order)
 
     def outboundAccountPosition(self, data):
         pass

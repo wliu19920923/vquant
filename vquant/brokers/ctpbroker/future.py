@@ -1,7 +1,8 @@
+from enum import Enum
 from datetime import datetime
 from vquant.brokers import Profit
 from vquant.stores.ctpstore import CtpStore
-from vquant.library.ctp.win64 import thostmduserapi, thosttraderapi
+from vquant.library.ctp.win64 import thosttraderapi
 from vquant.utils.catcher import exception_catcher
 from vquant.utils.logger import getFileLogger
 from vquant.utils.server_check import check_address_port
@@ -25,25 +26,23 @@ class Order(object):
       - Margin: not enough cash to execute the order.
       - Rejected: Rejected by the brokers
     """
-    Open, Close, CloseToday, CloseYesterday = thosttraderapi.THOST_FTDC_OF_Open, thosttraderapi.THOST_FTDC_OF_Close, thosttraderapi.THOST_FTDC_OF_CloseToday, thosttraderapi.THOST_FTDC_OF_CloseYesterday
-    Flags = {Open: 'Open', Close: 'Close', CloseToday: 'CloseToday', CloseYesterday: 'CloseYesterday'}
 
-    Buy, Sell = thosttraderapi.THOST_FTDC_D_Buy, thosttraderapi.THOST_FTDC_D_Sell
-    Sides = {Buy: 'Buy', Sell: 'Sell'}
+    class Flags(Enum):
+        Open, Close, CloseToday, CloseYesterday = thosttraderapi.THOST_FTDC_OF_Open, thosttraderapi.THOST_FTDC_OF_Close, thosttraderapi.THOST_FTDC_OF_CloseToday, thosttraderapi.THOST_FTDC_OF_CloseYesterday
 
-    Created = thosttraderapi.THOST_FTDC_OST_Unknown
-    Submitted = thosttraderapi.THOST_FTDC_OST_NoTradeNotQueueing
-    Accepted = thosttraderapi.THOST_FTDC_OST_NoTradeQueueing
-    Completed = thosttraderapi.THOST_FTDC_OST_AllTraded
-    Partial = thosttraderapi.THOST_FTDC_OST_PartTradedQueueing
-    Canceled = thosttraderapi.THOST_FTDC_OST_Canceled
-    Expired = thosttraderapi.THOST_FTDC_OST_PartTradedNotQueueing
-    NotTouched = thosttraderapi.THOST_FTDC_OST_NotTouched
-    Touched = thosttraderapi.THOST_FTDC_OST_Touched
-    Status = {
-        Created: 'Created', Submitted: 'Submitted', Accepted: 'Accepted', Completed: 'Completed', Partial: 'Partial', Canceled: 'Canceled',
-        Expired: 'Expired', NotTouched: 'NotTouched', Touched: 'Touched'
-    }
+    class Sides(Enum):
+        Buy, Sell = thosttraderapi.THOST_FTDC_D_Buy, thosttraderapi.THOST_FTDC_D_Sell
+
+    class Status(Enum):
+        Created = thosttraderapi.THOST_FTDC_OST_Unknown
+        Submitted = thosttraderapi.THOST_FTDC_OST_NoTradeNotQueueing
+        Accepted = thosttraderapi.THOST_FTDC_OST_NoTradeQueueing
+        Completed = thosttraderapi.THOST_FTDC_OST_AllTraded
+        Partial = thosttraderapi.THOST_FTDC_OST_PartTradedQueueing
+        Canceled = thosttraderapi.THOST_FTDC_OST_Canceled
+        Expired = thosttraderapi.THOST_FTDC_OST_PartTradedNotQueueing
+        NotTouched = thosttraderapi.THOST_FTDC_OST_NotTouched
+        Touched = thosttraderapi.THOST_FTDC_OST_Touched
 
     def __init__(self, exchange_id, order_sys_id, insert_date, update_time, symbol, flag, side, price, volume, status, commission, margin):
         self.id = exchange_id + order_sys_id
@@ -57,20 +56,6 @@ class Order(object):
         self.margin = margin
         self.status = status
 
-    def __dict__(self):
-        return {
-            'id': self.id,
-            'datetime': self.datetime,
-            'symbol': self.symbol,
-            'flag': self.flag,
-            'side': self.side,
-            'price': self.price,
-            'volume': self.volume,
-            'commission': self.commission,
-            'margin': self.margin,
-            'status': self.status
-        }
-
 
 class Trade(object):
     def __init__(self, trade_id, trade_date, trade_time, exchange_id, order_sys_id, symbol, flag, side, price, volume, profit):
@@ -83,19 +68,6 @@ class Trade(object):
         self.price = price
         self.volume = volume
         self.profit = profit
-
-    def __dict__(self):
-        return {
-            'id': self.id,
-            'datetime': self.datetime,
-            'order_id': self.order_id,
-            'symbol': self.symbol,
-            'flag': self.flag,
-            'side': self.side,
-            'price': self.price,
-            'volume': self.volume,
-            'profit': self.profit
-        }
 
 
 class Position(object):
@@ -118,66 +90,8 @@ class Position(object):
         self.today_volume = today_volume
         self.yesterday_volume = yesterday_volume
 
-    def __dict__(self):
-        return {
-            'symbol': self.symbol,
-            'cost': self.cost,
-            'direction': self.direction,
-            'volume': self.volume,
-            'margin': self.margin,
-            'today_cost': self.today_cost,
-            'yesterday_cost': self.yesterday_cost,
-            'today_margin': self.today_margin,
-            'yesterday_margin': self.yesterday_margin,
-            'today_volume': self.today_volume,
-            'yesterday_volume': self.yesterday_volume
-        }
 
 
-class MarketApi(thostmduserapi.CThostFtdcMdSpi):
-    def __init__(self, on_tick):
-        thostmduserapi.CThostFtdcMdSpi.__init__(self)
-        self.api = thostmduserapi.CThostFtdcMdApi_CreateFtdcMdApi()
-        self.logger = getFileLogger('CTPMarket')
-        self.subscribedContracts = list()
-        self.nRequestId = 0
-        self.on_tick = on_tick
-
-    def OnFrontConnected(self):
-        self.logger.info('OnFrontConnected -> OK')
-        field = thostmduserapi.CThostFtdcReqUserLoginField()
-        self.api.ReqUserLogin(field, self.nRequestId)
-        self.nRequestId += 1
-
-    @exception_catcher
-    def OnRspUserLogin(self, pRspUserLogin: thostmduserapi.CThostFtdcRspUserLoginField, pRspInfo: thostmduserapi.CThostFtdcRspInfoField, nRequestId: int, bIsLast: bool):
-        self.logger.info('OnRspUserLogin -> OK')
-        self.api.SubscribeMarketData([contract.encode() for contract in self.subscribedContracts], len(self.subscribedContracts))
-
-    @exception_catcher
-    def OnRspSubMarketData(self, pSpecificInstrument: thostmduserapi.CThostFtdcSpecificInstrumentField, pRspInfo: thostmduserapi.CThostFtdcRspInfoField, nRequestId: int, bIsLast: bool):
-        if pSpecificInstrument.InstrumentID not in self.subscribedContracts:
-            self.subscribedContracts.append(pSpecificInstrument.InstrumentID)
-
-    @exception_catcher
-    def OnRtnDepthMarketData(self, pDepthMarketData: thostmduserapi.CThostFtdcDepthMarketDataField):
-        updates = dict(symbol=pDepthMarketData.InstrumentID, price=pDepthMarketData.LastPrice)
-        self.on_tick(updates)
-
-    @exception_catcher
-    def OnRspError(self, pRspInfo: thostmduserapi.CThostFtdcRspInfoField, nRequestId: int, bIsLast: bool):
-        raise TypeError(pRspInfo.ErrorMsg)
-
-    def Start(self, pszFrontAddress):
-        if not check_address_port(pszFrontAddress):
-            raise ConnectionError('marketFrontAddressNotOpen')
-        self.api.RegisterSpi(self)
-        self.api.RegisterFront(pszFrontAddress)
-        self.api.Init()
-        self.api.Join()
-
-    def Stop(self):
-        self.api.Release()
 
 
 class AuthenticateField(object):
