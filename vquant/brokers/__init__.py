@@ -22,74 +22,48 @@ class Order(object):
       - Margin: not enough cash to execute the order.
       - Rejected: Rejected by the brokers
     """
-    Open, Close, CloseToday, CloseYesterday = range(4)
-    Flags = ['Open', 'Close', 'CloseToday', 'CloseYesterday']
 
-    Buy, Sell = range(2)
-    Sides = ['Buy', 'Sell']
+    class Flag:
+        Open, Close, CloseToday, CloseYesterday = ('Open', 'Close', 'CloseToday', 'CloseYesterday')
 
-    Created, Submitted, Accepted, Partial, Completed, Canceled, Expired, Margin, Rejected = range(9)
-    Status = [
-        'Created', 'Submitted', 'Accepted', 'Partial', 'Completed',
-        'Canceled', 'Expired', 'Margin', 'Rejected'
-    ]
+    class Side:
+        Buy, Sell = ('Buy', 'Sell')
 
-    def __init__(self, dt, symbol, flag, side, price, volume, commission, margin, status):
-        self.id = binascii.hexlify(os.urandom(12)).decode()
-        self.datetime = dt
+    class Status:
+        Created, Submitted, Accepted, Partial, Completed, Canceled, Expired, Margin, Rejected = (
+            'Created', 'Submitted', 'Accepted', 'Partial', 'Completed',
+            'Canceled', 'Expired', 'Margin', 'Rejected'
+        )
+
+    def __init__(self, _datetime, symbol, flag, side, price, quantity, commission, margin, status):
+        self._id = binascii.hexlify(os.urandom(12)).decode()
+        self._datetime = _datetime
         self.symbol = symbol
         self.flag = flag
         self.side = side
         self.price = price
-        self.volume = volume
+        self.quantity = quantity
         self.commission = commission
         self.margin = margin
         self.status = status
 
-    def __dict__(self):
-        return {
-            'id': self.id,
-            'datetime': self.datetime,
-            'symbol': self.symbol,
-            'flag': self.flag,
-            'side': self.side,
-            'price': self.price,
-            'volume': self.volume,
-            'commission': self.commission,
-            'margin': self.margin,
-            'status': self.status
-        }
-
 
 class Trade(object):
-    def __init__(self, dt, order_id, symbol, flag, side, price, volume, profit):
-        self.id = binascii.hexlify(os.urandom(12)).decode()
-        self.datetime = dt
+    def __init__(self, _datetime, order_id, symbol, flag, side, price, quantity, profit):
+        self._id = binascii.hexlify(os.urandom(12)).decode()
+        self._datetime = _datetime
         self.order_id = order_id
         self.symbol = symbol
         self.flag = flag
         self.side = side
         self.price = price
-        self.volume = volume
+        self.quantity = quantity
         self.profit = profit
-
-    def __dict__(self):
-        return {
-            'id': self.id,
-            'datetime': self.datetime,
-            'order_id': self.order_id,
-            'symbol': self.symbol,
-            'flag': self.flag,
-            'side': self.side,
-            'price': self.price,
-            'volume': self.volume,
-            'profit': self.profit
-        }
 
 
 class Position(object):
-    Long, Short = range(2)
-    Directions = ['Long', 'Short']
+    class Direction:
+        Long, Short = ('Long', 'Short')
 
     def __init__(self, symbol, cost, direction, volume, margin):
         self.symbol = symbol
@@ -98,26 +72,11 @@ class Position(object):
         self.volume = volume
         self.margin = margin
 
-    def __dict__(self):
-        return {
-            'symbol': self.symbol,
-            'cost': self.cost,
-            'direction': self.direction,
-            'volume': self.volume,
-            'margin': self.margin,
-        }
-
 
 class Profit(object):
-    def __init__(self, dt, amount):
-        self.datetime = dt
+    def __init__(self, _datetime, amount):
+        self._datetime = _datetime
         self.amount = amount
-
-    def __dict__(self):
-        return {
-            'datetime': self.datetime,
-            'amount': self.amount
-        }
 
 
 class SymbolInfo(object):
@@ -142,26 +101,15 @@ class SymbolInfo(object):
 
 
 class BackBroker(object):
-    def __init__(self, cerebro):
+    def __init__(self, cerebro, **kwargs):
         self.cerebro = cerebro
-        self.slide = 0
-        self.cash = 1000000
+        self.commission_rate = kwargs.get('commission_rate') or 0
+        self.margin_rate = kwargs.get('margin_rate') or 0
+        self.cash = kwargs.get('cash') or 1000000
         self.value = self.cash
         self.init_cash = self.cash
         self.available = self.cash
         self.frozen = 0
-        self.symbols = dict()
-        self.store = Store()
-
-    def set_cash(self, value):
-        self.cash = value
-        self.value = value
-        self.init_cash = value
-        self.available = value
-        self.frozen = 0
-
-    def add_symbol(self, symbol, info):
-        self.symbols[symbol] = info
 
     @property
     def prices(self):
@@ -177,7 +125,7 @@ class BackBroker(object):
 
     def on_value(self, value, benchmark_value):
         self.value = value
-        self.store.insert_value(dict(datetime=self.cerebro.index, value=value, benchmark_value=benchmark_value))
+        self.store.insert_value(dict(datetime=self.cerebro.datetime, value=value, benchmark_value=benchmark_value))
 
     def on_order(self, order):
         self.store.update_or_insert_order(order.__dict__())
@@ -276,21 +224,8 @@ class BackBroker(object):
         order = Order(dt, symbol, flag, side, price, volume, commission, margin, Order.Created)
         self.submit_order(order)
 
-    def move_positions(self):
-        positions = self.store.positions.loc[self.store.positions['volume'] > 0]
-        for row in positions.itertuples():
-            info = self.symbols[row.symbol]
-            if info.prompt_day == self.current_trading_day and self.previous_trading_day(info.target_index) != info.prompt_day:
-                if row.direction == Position.Long:
-                    self.create_order(self.cerebro.index, row.symbol, Order.Close, Order.Sell, self.prices[row.symbol], row.volume)
-                    self.create_order(self.cerebro.index, row.symbol, Order.Open, Order.Buy, self.prices[row.symbol], row.volume)
-                else:
-                    self.create_order(self.cerebro.index, row.symbol, Order.Close, Order.Buy, self.prices[row.symbol], row.volume)
-                    self.create_order(self.cerebro.index, row.symbol, Order.Open, Order.Sell, self.prices[row.symbol], row.volume)
-
     def on_next(self):
         profit = 0
-        self.move_positions()
         positions = self.store.positions.loc[self.store.positions['volume'] > 0]
         for row in positions.itertuples():
             price = self.prices[row.symbol]
