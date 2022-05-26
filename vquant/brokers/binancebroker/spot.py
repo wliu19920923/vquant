@@ -15,17 +15,14 @@ BinanceSocketURL = 'wss://stream.binance.com:9443'
 
 
 class Order(object):
-    Open = 'Open'
-    Flags = {Open: 'Open'}
+    class Side:
+        Buy, Sell = ('BUY', 'SELL')
 
-    Buy, Sell = ('BUY', 'SELL')
-    Sides = {Buy: 'Buy', Sell: 'Sell'}
+    class Type:
+        Market, Limit = ('MARKET', 'LIMIT')
 
-    Market, Limit = ('MARKET', 'LIMIT')
-    Types = {Market: 'Market', Limit: 'Limit'}
-
-    Created, Partial, Completed, Pending, Canceled, Expired, Rejected = ('NEW', 'PARTIALLY_FILLED', 'FILLED', 'PENDING_CANCEL', 'CANCELED', 'EXPIRED', 'REJECTED')
-    Status = {Created: 'Created', Partial: 'Partial', Completed: 'Completed', Pending: 'Pending', Canceled: 'Canceled', Expired: 'Expired', Rejected: 'Rejected'}
+    class Status:
+        Created, Partial, Completed, Pending, Canceled, Expired, Rejected = ('NEW', 'PARTIALLY_FILLED', 'FILLED', 'PENDING_CANCEL', 'CANCELED', 'EXPIRED', 'REJECTED')
 
     def __init__(self, dt, oid, symbol, flag, side, price, volume, commission, margin, status):
         self.id = oid

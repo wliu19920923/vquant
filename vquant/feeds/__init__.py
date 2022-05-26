@@ -18,17 +18,12 @@ class DateFeed(object):
         self.datas[name] = data
 
     def feed_to(self, callback):
-        while True:
-            datas = dict()
-            for key, data in self.datas.items():
-                try:
-                    datas[key] = data.loc[self.datetime]
-                except KeyError:
-                    continue
-            callback(datetime=self.datetime, datas=datas)
+        while self.datetime < pandas.Timestamp.now():
+            datas = {key: data.loc[self.datetime] for key, data in self.datas.items() if self.datetime in data.index}
             self.datetime += self.interval
-            if self.datetime > pandas.Timestamp.now():
-                return
+            if not datas:
+                continue
+            callback(datetime=self.datetime, datas=datas)
 
 
 if __name__ == '__main__':

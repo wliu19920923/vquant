@@ -51,3 +51,8 @@ class Analyzer(object):
     # def show(self):
     #     pyfolio.create_returns_tear_sheet(self.returns, self.benchmark_returns)
     #     pyplot.show()
+
+
+r = pandas.Series(['1', '2', '3'], ['a', 'b', 'c'])
+r.a=2
+print(r)

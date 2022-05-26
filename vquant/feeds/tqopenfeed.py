@@ -7,13 +7,12 @@ BaseDuration = 60000000000
 
 
 class TianQinOpenFeed(object):
-    ws_url = 'wss://openmd.shinnytech.com/t/md/front/mobile'
     fields = ['datetime', 'open', 'high', 'low', 'close', 'volume']
     duration = 60000000000
 
-    def __init__(self, exchange, symbol, callback):
-        self.ins = '%s.%s' % (exchange.upper(), symbol)
+    def __init__(self, symbol, callback):
         self.data = pandas.DataFrame(columns=self.fields)
+        self.symbol = symbol
         self.callback = callback
 
     def update_or_insert_kline(self, kline, is_last):
@@ -33,6 +32,7 @@ class TianQinOpenFeed(object):
     def analytical_kline(self, tick):
         try:
             klines = tick['data'][0]['klines'][self.ins][str(self.duration)]['data']
+            print(len(klines))
             is_last = len(klines) == 1
             for kline in klines.values():
                 self.update_or_insert_kline(kline, is_last)
@@ -49,7 +49,7 @@ class TianQinOpenFeed(object):
         ws.send(json.dumps({
             'aid': 'set_chart',
             'chart_id': 'PC_kline_chart',
-            'ins_list': self.ins,
+            'ins_list': self.symbol,
             'duration': self.duration,
             'view_width': 2000
         }))
@@ -70,7 +70,7 @@ class TianQinOpenFeed(object):
 
     def connect(self):
         ws = websocket.WebSocketApp(
-            self.ws_url,
+            url='wss://openmd.shinnytech.com/t/md/front/mobile',
             on_open=self.on_open,
             on_message=self.on_message,
             on_error=self.on_error,
@@ -85,5 +85,5 @@ if __name__ == '__main__':
         print(tf.data)
 
 
-    tf = TianQinOpenFeed('CFFEX', 'IF2206', msg)
+    tf = TianQinOpenFeed(['CFFEX.IF2206', 'CFFEX.IF2209'], msg)
     tf.connect()
