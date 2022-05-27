@@ -4,10 +4,10 @@ from pathlib import Path
 
 
 class DateFeed(object):
-    def __init__(self, **kwargs):
+    def __init__(self):
         self.datas = dict()
-        self.interval = kwargs.get('interval') or timedelta(minutes=1)
-        self.datetime = kwargs.get('datetime') or pandas.Timestamp.now()
+        self.interval = timedelta(minutes=1)
+        self.datetime = pandas.Timestamp.now()
         self.datetime = self.datetime - timedelta(seconds=self.datetime.second, microseconds=self.datetime.microsecond)
 
     def read_csv(self, path):
@@ -19,19 +19,5 @@ class DateFeed(object):
 
     def feed_to(self, callback):
         while self.datetime < pandas.Timestamp.now():
-            datas = {key: data.loc[self.datetime] for key, data in self.datas.items() if self.datetime in data.index}
-            self.datetime += self.interval
-            if not datas:
-                continue
-            callback(datetime=self.datetime, datas=datas)
-
-
-if __name__ == '__main__':
-    def cb(**kwargs):
-        print(kwargs)
-
-
-    d = DateFeed(interval=timedelta(minutes=30), datetime=pandas.Timestamp(year=2021, month=12, day=29, hour=14, minute=30))
-    d.read_csv('../../datas/RB0_30m.csv')
-    d.read_csv('../../datas/RB0_day.csv')
-    d.feed_to(cb)
+            message = {key: data.loc[self.datetime] for key, data in self.datas.items() if self.datetime in data.index}
+            callback(message)

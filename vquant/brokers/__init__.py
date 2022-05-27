@@ -11,13 +11,16 @@ class BackBroker(object):
         class Status:
             Created, Partial, Completed, Canceled, Expired, Rejected = ('Created', 'Partial', 'Completed', 'Canceled', 'Expired', 'Rejected')
 
-        Store = pandas.DataFrame(columns=['_id', 'datetime', 'symbol', 'side', 'price', 'quantity', 'traded_quantity', 'commission', 'margin', 'status'])
+        class Direction:
+            Long, Short = ('Long', 'Short')
+
+        Store = pandas.DataFrame(columns=['_id', 'datetime', 'symbol', 'direction', 'side', 'price', 'quantity', 'traded_quantity', 'commission', 'margin', 'status'])
 
         @staticmethod
-        def create(datetime, symbol, side, price, quantity, commission, margin, status):
+        def create(datetime, symbol, direction, side, price, quantity, commission, margin, status):
             return pandas.Series(
                 index=BackBroker.Order.Store.frame.columns,
-                data=[binascii.hexlify(os.urandom(12)).decode(), datetime, symbol, side, price, quantity, 0, commission, margin, status]
+                data=[binascii.hexlify(os.urandom(12)).decode(), datetime, symbol, direction, side, price, quantity, 0, commission, margin, status]
             )
 
         @staticmethod
@@ -56,75 +59,71 @@ class BackBroker(object):
         @staticmethod
         def submit(position):
             BackBroker.Position.Store = BackBroker.Position.Store.append(position, ignore_index=True)
-            BackBroker.Position.Store.set_index(['symbol', 'direction'])
+            BackBroker.Position.Store.set_index(BackBroker.Position.Store['_id'])
 
-    def __init__(self, cerebro, commission_rate=0, volume_multiple=1, leverage=1, cash=1000000):
-        self.cerebro = cerebro
-        self.commission_rate = commission_rate
-        self.volume_multiple = volume_multiple
-        self.leverage = leverage
-        self.cash = cash
-        self.value = cash
-        self.init_cash = cash
-        self.available = cash
+    class ExchangeInfo(object):
+        Store = pandas.DataFrame(columns=['symbol', 'commission_rate', 'leverage', 'price_tick', 'quantity_multiple', 'min_quantity', 'min_notional'])
+
+        @staticmethod
+        def create(symbol, commission_rate, leverage, price_tick, quantity_multiple, min_quantity, min_notional):
+            return pandas.Series(
+                index=BackBroker.Order.Store.frame.columns,
+                data=[symbol, commission_rate, leverage, price_tick, quantity_multiple, min_quantity, min_notional]
+            )
+
+        @staticmethod
+        def submit(info):
+            BackBroker.ExchangeInfo.Store = BackBroker.ExchangeInfo.Store.append(info, ignore_index=True)
+            BackBroker.ExchangeInfo.Store.set_index(BackBroker.ExchangeInfo.Store['symbol'])
+
+    def __init__(self, callback):
+        self.datetime = pandas.Timestamp.now()
+        self.callback = callback
+        self.available = 1000000
         self.frozen = 0
 
-    def on_value(self, value, benchmark_value):
-        self.value = value
+    def on_tick(self, datetime):
+        self.datetime = datetime
 
     def on_order(self, order):
-        self.cerebro.notify_order(order)
+        self.callback('notify_order', order)
 
     def on_trade(self, trade):
-        self.cerebro.notify_trade(trade)
+        self.callback('notify_trade', trade)
 
     def on_position(self, position):
-        self.cerebro.notify_position(position)
+        self.callback('notify_position', position)
 
     def on_profit(self, profit):
-        self.cerebro.notify_profit(profit)
-
-    def get_last_price(self, symbol):
-        pass
+        self.callback('notify_profit', profit)
 
     def get_position(self, symbol, direction):
-        return self.Position.Store.loc[symbol, direction]
+        return self.Position.Store.loc[symbol + direction]
 
-    def opening(self, trade):
-        if trade.side == Order.Buy:
-            position = self.positions(trade.symbol, Position.Long)
-        else:
-            position = self.positions(trade.symbol, Position.Short)
-        cost = trade.price * trade.volume * self.symbols[trade.symbol].volume_multiple
-        position.cost += cost
-        position.margin += cost * self.symbols[trade.symbol].margin_rate
-        position.volume += trade.volume
-        self.on_position(position)
-        return trade
+    def close_order(self, order):
+        if order.direction == self.Order.Direction.Long and order.side == self.Order.Side.Sell:
+            position = self.Position.Store.loc[order.symbol + self.Order.Direction.Long]
+            avg_price = position.cost / position.quantity
+            self.available += (order.price - avg_price) * order.quantity
+            position.quantity = position.quantity - order.quantity
+            position.cost = position.cost - avg_price * order.quantity
+        elif order.direction == self.Order.Direction.Short and order.side == self.Order.Side.Buy:
+            position = self.Position.Store.loc[order.symbol + self.Order.Direction.Short]
+            avg_price = position.cost / position.quantity
+            self.available += (avg_price - order.price) * order.quantity
+            position.quantity = position.quantity - order.quantity
+            position.cost = position.cost - avg_price * order.quantity
+        return order
 
-    def closing(self, trade):
-        if trade.side == Order.Buy:
-            position = self.positions(trade.symbol, Position.Short)
-            trade.profit = (position.cost / position.volume - trade.price) * trade.volume
-        else:
-            position = self.positions(trade.symbol, Position.Long)
-            trade.profit = (trade.price - position.cost / position.volume) * trade.volume
-        margin = position.margin / position.volume * trade.volume
-        position.cost -= position.cost / position.volume * trade.volume
-        position.margin -= margin
-        position.volume -= trade.volume
-        self.on_position(position)
-        self.frozen -= margin
-        self.available += margin
-        self.available += trade.profit
-        self.cash += margin + trade.profit
-        profit = Profit(self.cerebro.index, trade.profit)
-        self.on_profit(profit)
-        return trade
-
-    def match_order(self, order):
+    def settle_order(self, order):
         order.status = self.Order.Status.Completed
         order.traded_quantity = order.quantity
+        self.available = self.available - order.commission - order.margin
+        self.frozen = self.frozen + order.margin
+        return order
+
+    def match_order(self, order):
+        order = self.settle_order(order)
         trade = self.Trade.create(order.datetime, order.id, order.symbol, order.side, order.price, order.traded_quantity)
         self.Trade.submit(trade)
         self.on_trade(trade)
@@ -132,42 +131,40 @@ class BackBroker(object):
 
     def submit_order(self, order):
         if self.available > order.commission + order.margin:
-            self.available = self.available - order.commission - order.margin
-            self.frozen = self.frozen + order.margin
             order = self.match_order(order)
         else:
             order.status = self.Order.Status.Rejected
         self.Order.submit(order)
         self.on_order(order)
 
-    def create_order(self, datetime, symbol, side, price, quantity):
+    def create_order(self, symbol, direction, side, price, quantity):
         cost = price * quantity
-        margin = cost / self.leverage
-        commission = cost * self.commission_rate
-        order = self.Order.create(datetime, symbol, side, price, quantity, commission, margin, Order.Status.Created)
+        info = self.ExchangeInfo.Store.loc[symbol]
+        margin = cost / info.leverage
+        commission = cost * info.commission_rate
+        order = self.Order.create(self.datetime, symbol, direction, side, price, quantity, commission, margin, self.Order.Status.Created)
         self.submit_order(order)
 
-    def cancel_order(self, order_id):
-        pass
+    def cancel_order(self, symbol, order_id):
+        raise NotImplemented
 
-    def close_position(self, symbol, side, price, quantity):
-        pass
+    def close_long_position(self, symbol, price, quantity):
+        cost = price * quantity
+        info = self.ExchangeInfo.Store.loc[symbol]
+        position = self.Position.Store.loc[symbol + self.Order.Direction.Long]
+        commission = cost * info.commission_rate
+        margin = -(position.margin / position.quantity * quantity)
+        order = self.Order.create(self.datetime, symbol, self.Order.Direction.Long, self.Order.Side.Sell, price, quantity, commission, margin, self.Order.Status.Created)
+        self.submit_order(order)
 
-    def on_next(self):
-        profit = 0
-        positions = self.store.positions.loc[self.store.positions['volume'] > 0]
-        for row in positions.itertuples():
-            price = self.prices[row.symbol]
-            volume_multiple = self.symbols[row.symbol].volume_multiple
-            if row.direction == self.Position.Direction.Long:
-                profit += (price - row.cost / volume_multiple / row.volume) * row.volume * volume_multiple
-            else:
-                profit += (row.cost / volume_multiple / row.volume - price) * row.volume * volume_multiple
-        value = self.available + self.frozen + profit
-        benchmark_value = 0
-        for symbol in self.symbols:
-            benchmark_value += self.prices[symbol] * self.symbols[symbol].volume_multiple
-        self.on_value(value, benchmark_value)
+    def close_short_position(self, symbol, price, quantity):
+        cost = price * quantity
+        info = self.ExchangeInfo.Store.loc[symbol]
+        position = self.Position.Store.loc[symbol + self.Order.Direction.Short]
+        commission = cost * info.commission_rate
+        margin = -(position.margin / position.quantity * quantity)
+        order = self.Order.create(self.datetime, symbol, self.Order.Direction.Short, self.Order.Side.Buy, price, quantity, commission, margin, self.Order.Status.Created)
+        self.submit_order(order)
 
 
 __all__ = [BackBroker, ]

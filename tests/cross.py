@@ -1,10 +1,9 @@
-from vquant.brokers import SymbolInfo
 from vquant.strategy import Strategy
 from vquant.indicators import Indicator
 
 
 class CrossStrategy(Strategy):
-    _params = (
+    params = (
         ('symbol', 'j0'),
     )
 
