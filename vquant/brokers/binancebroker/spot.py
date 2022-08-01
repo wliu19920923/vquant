@@ -1,71 +1,81 @@
+import hashlib
 import hmac
 import json
+import pandas
 import time
-import hashlib
 import websocket
-from cacheout import LFUCache
 from datetime import datetime
 from urllib.parse import urlencode
-from vquant.stores import Store
 from vquant.utils.request import Request
 from vquant.utils.timeutil import millisecond_to_str_time
 
-BinanceBaseURL = 'https://api3.binance.com'
 BinanceSocketURL = 'wss://stream.binance.com:9443'
 
 
-class Order(object):
-    class Side:
-        Buy, Sell = ('BUY', 'SELL')
-
-    class Type:
-        Market, Limit = ('MARKET', 'LIMIT')
-
-    class Status:
-        Created, Partial, Completed, Pending, Canceled, Expired, Rejected = ('NEW', 'PARTIALLY_FILLED', 'FILLED', 'PENDING_CANCEL', 'CANCELED', 'EXPIRED', 'REJECTED')
-
-    def __init__(self, dt, oid, symbol, flag, side, price, volume, commission, margin, status):
-        self.id = oid
-        self.datetime = dt
-        self.symbol = symbol
-        self.flag = flag
-        self.side = side
-        self.price = price
-        self.volume = volume
-        self.commission = commission
-        self.margin = margin
-        self.status = status
-
-
-class Trade(object):
-    def __init__(self, dt, trade_id, order_id, symbol, flag, side, price, volume, profit):
-        self.id = trade_id
-        self.datetime = dt
-        self.order_id = order_id
-        self.symbol = symbol
-        self.flag = flag
-        self.side = side
-        self.price = price
-        self.volume = volume
-        self.profit = profit
-
-
-class Position(object):
-    def __init__(self, symbol, cost, volume):
-        self.symbol = symbol
-        self.cost = cost
-        self.volume = volume
-
-
 class BinanceSpotBroker(object):
+    class Order:
+        class Side:
+            Buy, Sell = ('BUY', 'SELL')
+
+        class Type:
+            Market, Limit = ('MARKET', 'LIMIT')
+
+        class Status:
+            Created, Partial, Completed, Pending, Canceled, Expired, Rejected = ('NEW', 'PARTIALLY_FILLED', 'FILLED', 'PENDING_CANCEL', 'CANCELED', 'EXPIRED', 'REJECTED')
+
+        Store = pandas.DataFrame(columns=['_id', 'datetime', 'symbol', 'direction', 'side', 'price', 'quantity', 'traded_quantity', 'commission', 'margin', 'status'])
+
+        @staticmethod
+        def create(_id, datetime, symbol, direction, side, price, quantity, traded_quantity, commission, margin, status):
+            return pandas.Series(
+                index=BinanceSpotBroker.Order.Store.frame.columns,
+                data=[_id, datetime, symbol, direction, side, price, quantity, traded_quantity, commission, margin, status]
+            )
+
+        @staticmethod
+        def submit(order):
+            BinanceSpotBroker.Order.Store = BinanceSpotBroker.Order.Store.append(order, ignore_index=True)
+            BinanceSpotBroker.Order.Store.set_index(BinanceSpotBroker.Order.Store['_id'])
+
+    class Trade(object):
+        Store = pandas.DataFrame(columns=['_id', 'datetime', 'order_id', 'direction', 'symbol', 'side', 'price', 'quantity'])
+
+        @staticmethod
+        def create(_id, datetime, order_id, symbol, side, price, quantity):
+            return pandas.Series(
+                index=BinanceSpotBroker.Order.Store.frame.columns,
+                data=[_id, datetime, order_id, symbol, side, price, quantity]
+            )
+
+        @staticmethod
+        def submit(trade):
+            BinanceSpotBroker.Trade.Store = BinanceSpotBroker.Trade.Store.append(trade, ignore_index=True)
+            BinanceSpotBroker.Trade.Store.set_index(BinanceSpotBroker.Trade.Store['_id'])
+
+    class Position(object):
+        class Direction:
+            Long, Short = ('Long', 'Short')
+
+        Store = pandas.DataFrame(columns=['_id', 'symbol', 'direction', 'quantity', 'margin', 'cost'])
+
+        @staticmethod
+        def create(symbol, direction, quantity, margin, cost):
+            return pandas.Series(
+                index=BinanceSpotBroker.Order.Store.frame.columns,
+                data=[symbol + direction, symbol, direction, quantity, margin, cost]
+            )
+
+        @staticmethod
+        def submit(position):
+            BinanceSpotBroker.Position.Store = BinanceSpotBroker.Position.Store.append(position, ignore_index=True)
+            BinanceSpotBroker.Position.Store.set_index(BinanceSpotBroker.Position.Store['_id'])
+
     QuoteAsset = 'USDT'
     ListenKeyDuration = 60 * 60
 
-    def __init__(self, cerebro, **kwargs):
-        self.cache = LFUCache()
-        self.ws_url = '%s/stream?streams=%s' % (BinanceSocketURL, self.get_listen_key())
+    def __init__(self, callback, **kwargs):
+        self.callback = callback
         self.assets = dict()
-        self.cerebro = cerebro
         self.listen_key = self.get_listen_key()
         self.listen_key_expired_time = time.time() + self.ListenKeyDuration
         self.access_key = kwargs.get('access_key')
@@ -75,7 +85,6 @@ class BinanceSpotBroker(object):
         self.available = 0
         self.frozen = 0
         self.profit = 0
-        self.store = Store()
 
     @staticmethod
     def convert_symbol(symbol):
@@ -97,7 +106,7 @@ class BinanceSpotBroker(object):
         return params
 
     def http_requests(self, method, path, **kwargs):
-        url = BinanceBaseURL + path
+        url = 'https://api3.binance.com' + path
         headers = {
             'X-MBX-APIKEY': self.access_key
         }
@@ -114,7 +123,7 @@ class BinanceSpotBroker(object):
     def create_order(self, symbol, side, price, quantity):
         params = dict(
             symbol=symbol, side=side, price=self.num_decimal_string(price), quantity=self.num_decimal_string(quantity),
-            timeInForce='GTC', type=Order.Limit
+            timeInForce='GTC', type=self.Order.Type.Limit
         )
         params = self.sign(params)
         response = self.http_requests(Request.POST, '/api/v3/order', params=params)
@@ -124,30 +133,23 @@ class BinanceSpotBroker(object):
         params = dict(symbol=symbol, orderId=int(order_id))
         params = self.sign(params)
         response = self.http_requests(Request.DELETE, '/api/v3/order', params=params)
-        return response.get('status') == Order.Canceled
+        return response.get('status') == self.Order.Status.Canceled
 
     def cancel_all_order(self, symbol):
         response = self.http_requests(Request.DELETE, '/api/v3/openOrders', params=self.sign({
             'symbol': self.convert_symbol(symbol)
         }))
-        return [Order(
-            dt=datetime.fromtimestamp(order['time'] / 1000),
-            oid=str(order['orderId']),
-            flag=Order.Open,
-            symbol=symbol,
-            side=Order.Buy if order['side'] == 'BUY' else Order.Sell,
-            price=float(order['price']),
-            volume=float(order['origQty']),
-            commission=0,
-            margin=0,
-            status=order['status']
-        ) for order in response]
+        for order in response:
+            orders = self.Order.Store.loc[self.Order.Store['_id'] == str(order['orderId'])]
+            self.Order.Store.loc[orders.index, ['status']] = order['status']
+            self.callback('on_order', dict(_id=str(order['orderId']), status=order['status']))
 
     def order_detail(self, symbol, order_id):
         params = dict(symbol=self.convert_symbol(symbol), orderId=order_id)
         params = self.sign(params)
         response = self.http_requests(Request.GET, '/api/v3/order', params=params)
-        return Order(str(response['orderId']), datetime.fromtimestamp(response['time'] / 1000), symbol, Order.Open, response['side'], float(response['price']), float(response['origQty']), response['status'], 0, Order.Created)
+        return Order(str(response['orderId']), datetime.fromtimestamp(response['time'] / 1000), symbol, Order.Open, response['side'], float(response['price']), float(response['origQty']),
+                     response['status'], 0, Order.Created)
 
     def active_orders(self, symbol):
         params = dict(symbol=self.convert_symbol(symbol))
@@ -246,8 +248,9 @@ class BinanceSpotBroker(object):
         raise ConnectionError(close_status_code, close_msg)
 
     def start(self):
+        url ='wss://stream.binance.com:9443/stream?streams=' + self.listen_key
         ws = websocket.create_connection(
-            url=self.ws_url,
+            url=url,
             on_open=self.on_open,
             on_message=self.on_message,
             on_error=self.on_error,

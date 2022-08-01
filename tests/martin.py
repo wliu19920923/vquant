@@ -1,4 +1,3 @@
-from vquant.brokers import SymbolInfo
 from vquant.strategy import Strategy
 from vquant.indicators import Indicator
 

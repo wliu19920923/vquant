@@ -14,26 +14,29 @@ class Strategy(object):
     def log(self, txt):
         raise NotImplemented
 
-    def on_tick(self, ticks):
-        for symbol, tick in ticks.items():
-            if symbol not in self.dataline:
-                self.dataline[symbol] = pandas.DataFrame()
-            self.dataline[symbol] = self.dataline[symbol].append(tick)
-            self.dataline[symbol].set_index(self.dataline[symbol]['datetime'], inplace=True)
-        self.next()
+    @property
+    def order(self):
+        return self.broker.Order.Store
 
-    def on_event(self, evnet, message):
-        return getattr(self, evnet)(message)
+    @property
+    def trade(self):
+        return self.broker.Trade.Store
 
-    def set_cash(self, value):
-        self.broker.available = value
-        self.broker.frozen = 0
+    @property
+    def datetime(self):
+        return self.datafeed.datetime
 
-    def set_interval(self, interval):
-        self.datafeed.interval = interval
+    @property
+    def interval(self):
+        return self.datafeed.interval
 
-    def set_datetime(self, datetime):
-        self.datafeed.datetime = datetime
+    @property
+    def netvalue(self):
+        return self.broker.NetValue.Store
+
+    @property
+    def position(self):
+        return self.broker.Position.Store
 
     def notify_order(self, order):
         raise NotImplemented
@@ -44,16 +47,51 @@ class Strategy(object):
     def notify_trade(self, trade):
         raise NotImplemented
 
+    def notify_value(self, value):
+        raise NotImplemented
+
+    def set_cash(self, value):
+        self.broker.available = value
+        self.broker.frozen = 0
+
+    def on_event(self, evnet, message):
+        return getattr(self, evnet)(message)
+
+    def on_tick(self, ticks):
+        for symbol, tick in ticks.items():
+            if symbol not in self.dataline:
+                self.dataline[symbol] = dict()
+            for interval in tick:
+                if interval not in self.dataline[symbol]:
+                    self.dataline[symbol][interval] = pandas.DataFrame()
+                self.dataline[symbol][interval] = self.dataline[symbol][interval].append(tick[interval])
+                self.dataline[symbol][interval].set_index(self.dataline[symbol][interval]['datetime'], inplace=True)
+        self.broker.datetime = self.datetime
+        self.on_next()
+
+    def on_next(self):
+        self.next()
+        benchmark_value, value = 0, self.broker.available + self.broker.frozen
+        for symbol in self.dataline:
+            initial_price = self.dataline[symbol][self.interval].iloc[0].close
+            price = self.dataline[symbol][self.interval].loc[self.datetime].close
+            benchmark_value += price - initial_price
+            position = self.broker.Position.Store.loc[symbol]
+            value = value + price * position.quantity - position.cost
+        netvalue = self.broker.NetValue.create(self.datetime, benchmark_value, value)
+        self.broker.NetValue.submit(netvalue)
+        self.broker.on_value(netvalue)
+
     def next(self):
         raise NotImplemented
 
     def sell(self, symbol, quantity):
-        price = self.dataline[symbol].loc[self.datafeed.datetime].close
-        self.broker.create_order(self.datafeed.datetime, symbol, self.broker.Order.Direction.Short, self.broker.Order.Side.Sell, price, quantity)
+        price = self.dataline[symbol][self.interval].loc[self.datetime].close
+        self.broker.create_order(symbol, self.broker.Order.Side.Sell, price, quantity)
 
     def buy(self, symbol, quantity):
-        price = self.dataline[symbol].loc[self.datafeed.datetime].close
-        self.broker.create_order(self.datafeed.datetime, symbol, self.broker.Order.Direction.Long, self.broker.Order.Side.Buy, price, quantity)
+        price = self.dataline[symbol][self.interval].loc[self.datetime].close
+        self.broker.create_order(symbol, self.broker.Order.Side.Buy, price, quantity)
 
     def run(self):
         self.datafeed.feed_to(self.on_tick)

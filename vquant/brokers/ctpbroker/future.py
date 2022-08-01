@@ -1,6 +1,5 @@
 from enum import Enum
 from datetime import datetime
-from vquant.brokers import Profit
 from vquant.stores.ctpstore import CtpStore
 from vquant.library.ctp.win64 import thosttraderapi
 from vquant.utils.catcher import exception_catcher

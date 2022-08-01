@@ -5,30 +5,37 @@ import pandas
 class Analyzer(object):
     def __init__(self, broker):
         self.broker = broker
-        self.broker.store.values['date'] = pandas.to_datetime(self.broker.store.values['datetime'])
-        self.broker.store.values.set_index('date', inplace=True)
-        self.broker.store.values = self.broker.store.values.resample('1D').agg({'value': 'last', 'benchmark_value': 'last'}).bfill()
-        self.broker.store.values.loc[:, 'datetime'] = self.broker.store.values.index.strftime('%Y-%m-%d').tolist()
+        self.broker.NetValue.Store['date'] = pandas.to_datetime(self.broker.NetValue.Store['datetime'])
+        self.broker.NetValue.Store.set_index('date', inplace=True)
+        self.broker.NetValue.Store = self.broker.NetValue.Store.resample('1D').agg({'value': 'last', 'benchmark_value': 'last'}).bfill()
+        self.broker.NetValue.Store.loc[:, 'datetime'] = self.broker.NetValue.Store.index.strftime('%Y-%m-%d').tolist()
         self.returns = pandas.Series(
-            index=self.broker.store.values.index,
-            data=(self.broker.store.values['value'] - self.broker.store.values['value'].shift(1)) / self.broker.store.values['value'].shift(1)
+            index=self.broker.NetValue.Store.index,
+            data=(self.broker.NetValue.Store['value'] - self.broker.NetValue.Store['value'].shift(1)) / self.broker.NetValue.Store['value'].shift(1)
         )
         self.benchmark_returns = pandas.Series(
-            index=self.broker.store.values.index,
-            data=(self.broker.store.values['benchmark_value'] - self.broker.store.values['benchmark_value'].shift(1)) / self.broker.store.values['benchmark_value'].shift(1)
+            index=self.broker.NetValue.Store.index,
+            data=(self.broker.NetValue.Store['benchmark_value'] - self.broker.NetValue.Store['benchmark_value'].shift(1)) / self.broker.NetValue.Store['benchmark_value'].shift(1)
         )
+
+    @property
+    def trades(self):
+        return self.broker.Trade.Store.to_dict(orient='records')
+
+    @property
+    def values(self):
+        return self.broker.NetValue.Store.to_dict(orient='records')
 
     @property
     def results(self):
         profit = self.broker.value - self.broker.init_cash
         loss = self.broker.store.trades.loc[self.broker.store.trades['profit'] < 0]['profit'].sum()
-        loss = abs(loss)
         return {
             'init_cash': self.broker.init_cash,
             'value': self.broker.value,
             'profit': profit,
             'signals': self.broker.store.trades.shape[0],
-            'loss': loss,
+            'loss': abs(loss),
             'profit_factor': profit / loss if loss else profit,
             'annual_return': empyrical.annual_return(self.returns),  # 年华收益率
             'benchmark_annual_return': empyrical.annual_return(self.benchmark_returns),  # 标准年华收益率
@@ -43,16 +50,5 @@ class Analyzer(object):
             'tail_ratio': empyrical.tail_ratio(self.returns),  # 尾比
             'alpha': empyrical.alpha(self.returns, factor_returns=self.benchmark_returns),  # 阿尔法
             'bate': empyrical.beta(self.returns, factor_returns=self.benchmark_returns),  # 贝塔
-            'r_squared': empyrical.stability_of_timeseries(self.returns),  # r平方
-            'values': self.broker.store.values.to_dict(orient='records'),  # 日收益曲线
-            'trades': self.broker.store.trades.to_dict(orient='records')
+            'r_squared': empyrical.stability_of_timeseries(self.returns)  # r平方
         }
-
-    # def show(self):
-    #     pyfolio.create_returns_tear_sheet(self.returns, self.benchmark_returns)
-    #     pyplot.show()
-
-
-r = pandas.Series(['1', '2', '3'], ['a', 'b', 'c'])
-r.a=2
-print(r)
