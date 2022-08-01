@@ -26,17 +26,12 @@ class Analyzer(object):
     def values(self):
         return self.broker.NetValue.Store.to_dict(orient='records')
 
-    @property
-    def results(self):
-        profit = self.broker.value - self.broker.init_cash
-        loss = self.broker.store.trades.loc[self.broker.store.trades['profit'] < 0]['profit'].sum()
+    def run(self):
         return {
-            'init_cash': self.broker.init_cash,
+            'capital': self.broker.capital,
             'value': self.broker.value,
-            'profit': profit,
-            'signals': self.broker.store.trades.shape[0],
-            'loss': abs(loss),
-            'profit_factor': profit / loss if loss else profit,
+            'profit': self.broker.value - self.broker.capital,
+            'signals': self.broker.Trade.Store.shape[0],
             'annual_return': empyrical.annual_return(self.returns),  # 年华收益率
             'benchmark_annual_return': empyrical.annual_return(self.benchmark_returns),  # 标准年华收益率
             'annual_volatility': empyrical.annual_volatility(self.returns),  # 年华波动率

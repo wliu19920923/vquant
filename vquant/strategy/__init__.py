@@ -51,8 +51,9 @@ class Strategy(object):
         raise NotImplemented
 
     def set_cash(self, value):
-        self.broker.available = value
-        self.broker.frozen = 0
+        self.broker.cash = value
+        self.broker.capital = value
+        self.broker.value = value
 
     def on_event(self, evnet, message):
         return getattr(self, evnet)(message)
@@ -71,13 +72,14 @@ class Strategy(object):
 
     def on_next(self):
         self.next()
-        benchmark_value, value = 0, self.broker.available + self.broker.frozen
+        benchmark_value, value = self.broker.capital, self.broker.cash
         for symbol in self.dataline:
             initial_price = self.dataline[symbol][self.interval].iloc[0].close
             price = self.dataline[symbol][self.interval].loc[self.datetime].close
             benchmark_value += price - initial_price
-            position = self.broker.Position.Store.loc[symbol]
-            value = value + price * position.quantity - position.cost
+            if symbol in self.broker.Position.Store.index:
+                position = self.broker.Position.Store.loc[symbol]
+                value = value + price * position.quantity - position.cost
         netvalue = self.broker.NetValue.create(self.datetime, benchmark_value, value)
         self.broker.NetValue.submit(netvalue)
         self.broker.on_value(netvalue)

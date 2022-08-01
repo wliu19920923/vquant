@@ -6,10 +6,10 @@ import binascii
 class BackBroker(object):
     class Order:
         class Side:
-            Buy, Sell = ('Buy', 'Sell')
+            Buy, Sell = ('buy', 'sell')
 
         class Status:
-            Created, Partial, Completed, Canceled, Expired, Rejected = ('Created', 'Partial', 'Completed', 'Canceled', 'Expired', 'Rejected')
+            Created, Partial, Completed, Canceled, Expired, Rejected = ('created', 'partial', 'completed', 'canceled', 'expired', 'rejected')
 
         Store = pandas.DataFrame(columns=['_id', 'datetime', 'symbol', 'side', 'price', 'quantity', 'traded_quantity', 'commission', 'margin', 'status'])
 
@@ -87,6 +87,8 @@ class BackBroker(object):
 
     def __init__(self, callback):
         self.cash = 1000000
+        self.value = self.cash
+        self.capital = self.cash
         self.datetime = pandas.Timestamp.now()
         self.callback = callback
 
@@ -111,6 +113,7 @@ class BackBroker(object):
         self.callback('notify_profit', profit)
 
     def on_value(self, value):
+        self.value = value.value
         self.callback('notify_value', value)
 
     def update_or_insert_position(self, order):
@@ -121,12 +124,24 @@ class BackBroker(object):
         position = self.Position.Store.loc[order.symbol]
         if order.side == self.Order.Side.Buy:
             position.cost = position.cost + cost
-            quantity = position.quantity + order.quantity
+            if position.quantity < 0:
+                if abs(position.quantity) > order.quantity:
+                    position.margin -= position.margin / abs(position.quantity) * order.quantity
+                else:
+                    position.margin = (order.quantity - abs(position.quantity)) * order.margin / order.quantity
+            else:
+                position.margin += order.margin
+            position.quantity += order.quantity
         else:
             position.cost = position.cost - cost
-            quantity = position.quantity - order.quantity
-        # 当前价格 * 当前数量的绝对值 * 保证金比例 - 上一次保证金 / 上一次数量
-        position.margin = order.price * abs(quantity) * order.margin / order.price
+            if position.quantity > 0:
+                if position.quantity > order.quantity:
+                    position.margin -= position.margin / position.quantity * order.quantity
+                else:
+                    position.margin = (order.quantity - abs(position.quantity)) * order.margin / order.quantity
+            else:
+                position.margin += order.margin
+            position.quantity -= order.quantity
         self.Position.Store.loc[order.symbol, ['cost', 'quantity', 'margin']] = [position.cost, position.quantity, position.margin]
         return position
 

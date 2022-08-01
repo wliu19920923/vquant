@@ -12,16 +12,24 @@ class CrossStrategy(Strategy):
         super(CrossStrategy, self).__init__(broker, datafeed)
 
     def notify_order(self, order):
-        print(order)
+        # print(order)
+        pass
 
     def notify_trade(self, trade):
-        print(trade)
+        # print(trade)
+        pass
 
     def notify_profit(self, profit):
-        print(profit)
+        # print(profit)
+        pass
 
     def notify_position(self, position):
-        print(position)
+        # print(position)
+        pass
+
+    def notify_value(self, value):
+        # print(value)
+        pass
 
     def next(self):
         dateline = self.dataline[self.params.symbol][self.interval]
@@ -49,8 +57,7 @@ if __name__ == '__main__':
     strategy = CrossStrategy(broker=BackBroker, datafeed=datafeed)
     symbol_info = strategy.broker.ExchangeInfo.create(symbol='J0', commission_rate=0.0003, leverage=9, quantity_multiple=100, price_tick=0.01, min_quantity=1, min_notional=1)
     strategy.broker.ExchangeInfo.submit(symbol_info)
-    print(strategy.broker.ExchangeInfo.Store)
     strategy.set_cash(1000000)
     strategy.run()
-    r = Analyzer(strategy.broker)
+    r = Analyzer(strategy.broker).run()
     print(r)
